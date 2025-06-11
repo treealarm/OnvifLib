@@ -24,4 +24,9 @@
     <PackageReference Include="System.ServiceModel.Primitives" Version="8.*" />
     <PackageReference Include="System.ServiceModel.Security" Version="6.0.*" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="README.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
