@@ -1,4 +1,5 @@
 ﻿using PtzServiceReference;
+using System.ServiceModel;
 using System.ServiceModel.Channels;
 
 namespace OnvifLib
@@ -26,7 +27,11 @@ namespace OnvifLib
 
     protected async Task InitializeAsync()
     {
-      _ptzClient = OnvifClientFactory.CreateClient<PTZClient, PTZ>(_url, _binding, _username, _password);
+      _ptzClient = _onvifClientFactory.CreateClient<PTZClient, PTZ>(
+        new EndpointAddress(_url), 
+        _binding, 
+        _username, 
+        _password);
       await _ptzClient.OpenAsync();
       _caps = await _ptzClient.GetServiceCapabilitiesAsync();
     }

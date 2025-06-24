@@ -7,7 +7,7 @@ using System.ServiceModel.Channels;
 using System.Text;
 using System.Xml;
 
-namespace Devices.Onvif.Security
+namespace OnvifLib
 {
     class DigestSecurityHeader : MessageHeader
     {

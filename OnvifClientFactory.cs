@@ -1,17 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-
-using System.ServiceModel.Channels;
-using System.ServiceModel.Description;
+﻿using System.ServiceModel.Channels;
 using System.ServiceModel;
 
 
 namespace OnvifLib
 {
-  public static class OnvifClientFactory
+  public class OnvifClientFactory
   {
-    public static TClient CreateClient<TClient, TInterface>(
-        string url,
+    private SecurityToken? _securityToken = null;
+    public TClient CreateClient<TClient, TInterface>(
+        EndpointAddress endpoint,
         CustomBinding binding,
         string username,
         string password)
@@ -21,7 +18,6 @@ namespace OnvifLib
       var clientInspector = new CustomMessageInspector();
       var behavior = new CustomEndpointBehavior(clientInspector);
 
-      var endpoint = new EndpointAddress(url);
       var client = (TClient)Activator.CreateInstance(typeof(TClient), binding, endpoint)!;
 
       // Установка данных авторизации
@@ -31,9 +27,17 @@ namespace OnvifLib
       client.ClientCredentials.HttpDigest.ClientCredential.UserName = username;
       client.ClientCredentials.HttpDigest.ClientCredential.Password = password;
 
+      if (_securityToken != null)
+        clientInspector.Headers.Add(new DigestSecurityHeader(client.ClientCredentials.HttpDigest.ClientCredential, _securityToken));
+
       client.Endpoint.EndpointBehaviors.Add(behavior);
 
       return client;
+    }
+
+    public void SetSecurityToken(SecurityToken token)
+    {
+      _securityToken = token;
     }
   }
 

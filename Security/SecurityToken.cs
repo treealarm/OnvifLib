@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace Devices.Onvif.Security
+namespace OnvifLib
 {
-    class SecurityToken
+    public class SecurityToken
     {
         public DateTime ServerTime { get; }
 
