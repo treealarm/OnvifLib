@@ -18,7 +18,7 @@ namespace OnvifLib
     private TimeSpan _terminationTime = TimeSpan.FromSeconds(30);
     private SubscriptionManagerClient? _subscriptionManagerClient;
 
-    public event Action<NotificationMessageHolderType>? OnEventReceived;
+    public event Action<NotificationMessageHolderType[]>? OnEventReceived;
 
     protected EventService1(string url, CustomBinding binding, string username, string password, string profile) :
       base(url, binding, username, password, profile)
@@ -123,11 +123,14 @@ namespace OnvifLib
     {
       await Task.Delay(0);
 
-      if (_pullClient == null) 
+      if (_pullClient == null)
         throw new InvalidOperationException("Pull client not initialized");
 
       _cts = new CancellationTokenSource();
-      _ = Task.Run(() => ReceiveLoopAsync(_cts.Token));
+      _ = Task.Run(async () =>
+      {
+        await ReceiveLoopAsync(_cts.Token);
+      });
     }
 
     public void StopReceiving()
@@ -135,7 +138,7 @@ namespace OnvifLib
       _cts?.Cancel();
     }
 
-    private async Task ReceiveLoopAsync(CancellationToken token)
+    private async Task<bool> ReceiveLoopAsync(CancellationToken token)
     {
       int renewIntervalMs = (int)(_terminationTime.TotalMilliseconds / 2);
       int lastRenewTime = Environment.TickCount;
@@ -157,10 +160,8 @@ namespace OnvifLib
 
           var response = await _pullClient.PullMessagesAsync(request);
 
-          foreach (var msg in response.NotificationMessage)
-          {
-            OnEventReceived?.Invoke(msg);
-          }
+           OnEventReceived?.Invoke(response.NotificationMessage);
+
 
           if (Environment.TickCount - lastRenewTime > renewIntervalMs && _subscriptionManagerClient != null)
           {
@@ -180,7 +181,7 @@ namespace OnvifLib
         catch (Exception ex)
         {
           Console.WriteLine("Pull/Renew failed: " + ex.Message);
-          await Task.Delay(2000, token);
+          await Task.Delay(2000);
         }
       }
 
@@ -195,6 +196,7 @@ namespace OnvifLib
           Console.WriteLine("Unsubscribe failed: " + ex.Message);
         }
       }
+      return true;
     }
 
     public override void Dispose()
