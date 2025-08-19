@@ -120,7 +120,7 @@ namespace OnvifLib
       );
     }
 
-    public async Task StartReceiving()
+    public async Task StartReceivingAsync()
     {
       await Task.Delay(0);
 
