@@ -4,6 +4,7 @@ using System.ServiceModel;
 using System.Xml;
 using DeviceServiceReference;
 using DateTime = System.DateTime;
+using System.Runtime.CompilerServices;
 
 namespace OnvifLib
 {
@@ -133,9 +134,13 @@ namespace OnvifLib
       });
     }
 
-    public void StopReceiving()
+    public async Task StopReceivingAsync()
     {
-      _cts?.Cancel();
+      if (_cts == null)
+      {
+        return;
+      }
+      await _cts.CancelAsync();
     }
 
     private async Task<bool> ReceiveLoopAsync(CancellationToken token)

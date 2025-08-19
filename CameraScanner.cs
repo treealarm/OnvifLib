@@ -46,7 +46,7 @@ namespace OnvifLib
                 continue;
             }
 
-            var cam = await Camera.CreateAsync(ip.ToString(), port, cred.username, cred.password);
+            var cam = Camera.Create(ip.ToString(), port, cred.username, cred.password);
             if (cam == null || !await cam.IsAlive())
               continue;
 
