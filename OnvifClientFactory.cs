@@ -35,9 +35,13 @@ namespace OnvifLib
       return client;
     }
 
-    public void SetSecurityToken(SecurityToken token)
+    public void SetSecurityToken(SecurityToken? token)
     {
       _securityToken = token;
+    }
+    public SecurityToken? GetSecurityToken()
+    {
+      return _securityToken;
     }
   }
 

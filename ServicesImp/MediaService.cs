@@ -83,7 +83,6 @@ namespace OnvifLib
       return new ImageResult()
       { Data = data, Extension = GetExtensionFromMime(mime), MimeType = mime};
     }
-    protected virtual async Task InitializeAsync() { await Task.CompletedTask; }
     public virtual async Task<ImageResult?> GetImage()
     {
       await Task.CompletedTask;

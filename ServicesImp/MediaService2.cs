@@ -3,6 +3,7 @@ using System.ServiceModel.Channels;
 using System.ServiceModel;
 using MediaServiceReference1;
 using System;
+using PtzServiceReference;
 
 namespace OnvifLib
 {
@@ -22,16 +23,13 @@ namespace OnvifLib
 
     protected override async Task InitializeAsync()
     {
-      var endpoint = new EndpointAddress(_url);
-      var clientInspector = new CustomMessageInspector();
-      var behavior = new CustomEndpointBehavior(clientInspector);
-      _mediaClient2 = new Media2Client(_binding, endpoint);
+      await base.InitializeAsync();
 
-      _mediaClient2.ClientCredentials.UserName.UserName = _username;
-      _mediaClient2.ClientCredentials.UserName.Password = _password;
-      _mediaClient2.ClientCredentials.HttpDigest.ClientCredential.UserName = _username;
-      _mediaClient2.ClientCredentials.HttpDigest.ClientCredential.Password = _password;
-      _mediaClient2.Endpoint.EndpointBehaviors.Add(behavior);
+      _mediaClient2 = _onvifClientFactory.CreateClient<Media2Client, MediaServiceReference.Media2>(
+        new EndpointAddress(_url),
+        _binding,
+        _username,
+        _password);
       await _mediaClient2.OpenAsync();
 
       var request = new MediaServiceReference.GetProfilesRequest { Type = ["All"] };

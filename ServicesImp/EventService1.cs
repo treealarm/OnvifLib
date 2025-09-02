@@ -36,8 +36,10 @@ namespace OnvifLib
 
       return instance1;
     }
-    protected async Task InitializeAsync()
+    protected async override Task InitializeAsync() 
     {
+      await base.InitializeAsync();
+
       _eventClient1 = _onvifClientFactory.CreateClient<EventPortTypeClient, EventPortType>(
         new EndpointAddress(_url), 
         _binding, 
@@ -63,20 +65,6 @@ namespace OnvifLib
 
       _pullPointAddress = new EndpointAddress(subscriptionUri, headers.ToArray());
 
-
-      DateTime deviceTime = await GetDeviceTimeAsync();
-
-      if (!string.IsNullOrEmpty(_username))
-      {
-        byte[] nonceBytes = new byte[20];
-        var random = new Random();
-        random.NextBytes(nonceBytes);
-
-        var token = new SecurityToken(deviceTime, nonceBytes);
-
-        _onvifClientFactory.SetSecurityToken(token);
-      }
-
       _pullClient = _onvifClientFactory.
         CreateClient<PullPointSubscriptionClient, PullPointSubscription>(
         _pullPointAddress, 
@@ -94,31 +82,7 @@ namespace OnvifLib
       await _subscriptionManagerClient.OpenAsync();
     }
 
-    protected async Task<DateTime> GetDeviceTimeAsync()
-    {
-      var deviceClient = _onvifClientFactory.CreateClient<DeviceClient, Device>(
-        new EndpointAddress(_url), 
-        _binding, 
-        _username, 
-        _password);
-      await deviceClient.OpenAsync();
-
-      var deviceSystemDateTime = await deviceClient.GetSystemDateAndTimeAsync();
-
-      if (deviceSystemDateTime.UTCDateTime == null)
-        return DateTime.UtcNow;
-
-      return new DateTime(
-          deviceSystemDateTime.UTCDateTime.Date.Year,
-          deviceSystemDateTime.UTCDateTime.Date.Month,
-          deviceSystemDateTime.UTCDateTime.Date.Day,
-          deviceSystemDateTime.UTCDateTime.Time.Hour,
-          deviceSystemDateTime.UTCDateTime.Time.Minute,
-          deviceSystemDateTime.UTCDateTime.Time.Second,
-          0,
-          DateTimeKind.Utc
-      );
-    }
+    
 
     public async Task StartReceivingAsync()
     {

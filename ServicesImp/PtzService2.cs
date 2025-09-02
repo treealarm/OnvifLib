@@ -25,8 +25,9 @@ namespace OnvifLib
       return instance;
     }
 
-    protected async Task InitializeAsync()
+    protected async override Task InitializeAsync()
     {
+      await base.InitializeAsync();
       _ptzClient = _onvifClientFactory.CreateClient<PTZClient, PTZ>(
         new EndpointAddress(_url), 
         _binding, 

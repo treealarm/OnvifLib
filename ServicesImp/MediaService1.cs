@@ -1,7 +1,6 @@
 ﻿using System.ServiceModel.Channels;
 using System.ServiceModel;
 using MediaServiceReference1;
-using EventServiceReference1;
 
 namespace OnvifLib
 {
@@ -23,24 +22,13 @@ namespace OnvifLib
 
     protected override async Task InitializeAsync()
     {
-      var endpoint = new EndpointAddress(_url);
-      var clientInspector = new CustomMessageInspector();
-      var behavior = new CustomEndpointBehavior(clientInspector);
+      await base.InitializeAsync();
 
-      _mediaClient1 = _onvifClientFactory.
-          CreateClient<MediaClient, MediaServiceReference1.Media>(
-          endpoint,
-          _binding,
-          _username,
-          _password);
-
-      //_mediaClient1 = new MediaClient(_binding, endpoint);
-
-      //_mediaClient1.ClientCredentials.UserName.UserName = _username;
-      //_mediaClient1.ClientCredentials.UserName.Password = _password;
-      //_mediaClient1.ClientCredentials.HttpDigest.ClientCredential.UserName = _username;
-      //_mediaClient1.ClientCredentials.HttpDigest.ClientCredential.Password = _password;
-      //_mediaClient1.Endpoint.EndpointBehaviors.Add(behavior);
+      _mediaClient1 = _onvifClientFactory.CreateClient<MediaClient, MediaServiceReference1.Media>(
+        new EndpointAddress(_url),
+        _binding,
+        _username,
+        _password);
       await _mediaClient1.OpenAsync();
 
       var profilesResponse = await _mediaClient1.GetProfilesAsync();

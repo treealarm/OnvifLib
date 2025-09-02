@@ -15,60 +15,96 @@ public class Camera
   private readonly string _password;
   private readonly int _port;
   private readonly string _ip;
-  private readonly DeviceClient _deviceClient;
+
   private readonly CustomBinding _binding;
-
+  private readonly OnvifClientFactory _onvifClientFactory = new OnvifClientFactory();
   private Task<Dictionary<string, string>?>? _servicesTask;
+  private System.DateTime _tokenExpiry = System.DateTime.UtcNow;
   public Task InitTask { get; private set; } = Task.CompletedTask;
+  private async Task<DeviceClient> GetDevice()
+  {
+    var endpoint = new EndpointAddress(_url);    
+    if (System.DateTime.UtcNow >= _tokenExpiry)
+    {
+      _tokenExpiry = System.DateTime.UtcNow.AddMinutes(1);
+      _onvifClientFactory.SetSecurityToken(null);
+    }
 
-  public string Url
-  {
-    get
-    {
-      return _url;
+    if (!string.IsNullOrEmpty(_username) && 
+      _onvifClientFactory.GetSecurityToken() == null)
+    {      
+      System.DateTime? deviceTime = await GetDeviceTimeAsync();
+
+      byte[] nonceBytes = new byte[20];
+      var random = new Random();
+      random.NextBytes(nonceBytes);
+
+      var token = new SecurityToken(deviceTime ?? System.DateTime.UtcNow, nonceBytes);
+
+      _onvifClientFactory.SetSecurityToken(token);   
     }
+
+    var deviceClient = _onvifClientFactory.
+      CreateClient<DeviceClient, DeviceServiceReference.Device>(
+        endpoint,
+        _binding,
+        _username,
+        _password
+      );
+
+    await deviceClient.OpenAsync();
+
+
+    return deviceClient;
   }
-  public string User
+  public async Task<System.DateTime?> GetDeviceTimeAsync()
   {
-    get
-    {
-      return _username;
-    }
+    _onvifClientFactory.SetSecurityToken(null);
+    var endpoint = new EndpointAddress(_url);
+    var deviceClient = _onvifClientFactory.
+      CreateClient<DeviceClient, DeviceServiceReference.Device>(
+        endpoint,
+        _binding,
+        _username,
+        _password
+      );
+
+    var deviceSystemDateTime = await deviceClient.GetSystemDateAndTimeAsync();
+
+    if (deviceSystemDateTime.UTCDateTime == null)
+      return null;
+
+    return new System.DateTime(
+        deviceSystemDateTime.UTCDateTime.Date.Year,
+        deviceSystemDateTime.UTCDateTime.Date.Month,
+        deviceSystemDateTime.UTCDateTime.Date.Day,
+        deviceSystemDateTime.UTCDateTime.Time.Hour,
+        deviceSystemDateTime.UTCDateTime.Time.Minute,
+        deviceSystemDateTime.UTCDateTime.Time.Second,
+        0,
+        DateTimeKind.Utc
+    );
   }
-  public string Password
-  {
-    get
-    {
-      return _password;
-    }
-  }
-  public string Ip
-  {
-    get
-    {
-      return _ip;
-    }
-  }
-  public int Port
-  {
-    get
-    {
-      return _port;
-    }
-  }
+
+  public string Url { get { return _url; } }
+  public string User { get { return _username; } }
+  public string Password { get { return _password; } }
+  public string Ip { get { return _ip; } }
+  public int Port { get { return _port; } }
+
   //http://192.168.1.150:8899/onvif/device_service
   public static  string CreateUrl(string ip, int port)
   {
     return $"http://{ip}:{port}/onvif/device_service";
   }
 
-  public static Camera Create(string ip, int port, string username, string password)
+  public static Camera Create(string ip, int port, string username, string password, double timeout = 15)
   {
-    var cam = new Camera(ip, port, username, password);
+    var cam = new Camera(ip, port, username, password, timeout);
     cam.InitTask = cam.InitAsync(); // запускаем в фоне
     return cam;
   }
-  private Camera(string ip, int port, string username, string password)
+  private Camera(string ip, int port, string username, string password, double timeout)
   {
     _url = CreateUrl(ip, port);
     _ip = ip;
@@ -84,7 +120,6 @@ public class Camera
       }
     );
 
-    var timeout = 5;
     _binding.OpenTimeout = TimeSpan.FromSeconds(timeout);
     _binding.CloseTimeout = TimeSpan.FromSeconds(timeout);
     _binding.SendTimeout = TimeSpan.FromSeconds(timeout);
@@ -92,12 +127,8 @@ public class Camera
 
     var endpoint = new EndpointAddress(_url);
 
-    _deviceClient = new DeviceClient(_binding, endpoint);
-
-    _deviceClient.ClientCredentials.UserName.UserName = _username;
-    _deviceClient.ClientCredentials.UserName.Password = _password;
-    _deviceClient.ClientCredentials.HttpDigest.ClientCredential.UserName = _username;
-    _deviceClient.ClientCredentials.HttpDigest.ClientCredential.Password = _password;
+    var clientInspector = new CustomMessageInspector();
+    var behavior = new CustomEndpointBehavior(clientInspector);
   }
 
   private async Task InitAsync()
@@ -173,28 +204,14 @@ public class Camera
   {
     try
     {
-      var result = await _deviceClient.GetServicesAsync(true);
+      var client = await GetDevice();
+      var result = await client.GetServicesAsync(true);
       return result.Service.ToDictionary(s => s.Namespace, s => s.XAddr);
     }
     catch (Exception ex)
     {
       Console.WriteLine(ex);
       return null;
-    }
-  }
-
-  /// <summary>
-  /// Закрыть соединение
-  /// </summary>
-  public void Close()
-  {
-    try
-    {
-      _deviceClient.Close();
-    }
-    catch
-    {
-      _deviceClient.Abort();
     }
   }
 
