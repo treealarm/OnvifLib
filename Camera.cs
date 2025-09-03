@@ -54,14 +54,14 @@ public class Camera
 
     await deviceClient.OpenAsync();
 
-
     return deviceClient;
   }
   public async Task<System.DateTime?> GetDeviceTimeAsync()
   {
     _onvifClientFactory.SetSecurityToken(null);
     var endpoint = new EndpointAddress(_url);
-    var deviceClient = _onvifClientFactory.
+
+    using var deviceClient = _onvifClientFactory.
       CreateClient<DeviceClient, DeviceServiceReference.Device>(
         endpoint,
         _binding,
@@ -204,7 +204,7 @@ public class Camera
   {
     try
     {
-      var client = await GetDevice();
+      using var client = await GetDevice();
       var result = await client.GetServicesAsync(true);
       return result.Service.ToDictionary(s => s.Namespace, s => s.XAddr);
     }

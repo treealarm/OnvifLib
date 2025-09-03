@@ -47,7 +47,6 @@ namespace OnvifLib
         _password);
       await _eventClient1.OpenAsync();
 
-
       var subscriptionResponse = await _eventClient1.CreatePullPointSubscriptionAsync(new CreatePullPointSubscriptionRequest
       {
         InitialTerminationTime = XmlConvert.ToString(_terminationTime)

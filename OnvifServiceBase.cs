@@ -40,6 +40,7 @@ namespace OnvifLib
       }
       catch (Exception ex)
       {
+        _ = ex;
       }
     }
     protected async Task<System.DateTime> GetDeviceTimeAsync()
