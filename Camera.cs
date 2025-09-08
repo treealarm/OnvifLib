@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Concurrent;
+using System.Net;
 using System.ServiceModel;
 using System.ServiceModel.Channels;
 using System.Text;
@@ -21,6 +22,9 @@ public class Camera
   private Task<Dictionary<string, string>?>? _servicesTask;
   private System.DateTime _tokenExpiry = System.DateTime.UtcNow;
   public Task InitTask { get; private set; } = Task.CompletedTask;
+
+  private readonly OnvifServiceCache _serviceCache;
+
   private async Task<DeviceClient> GetDevice()
   {
     var endpoint = new EndpointAddress(_url);    
@@ -129,6 +133,8 @@ public class Camera
 
     var clientInspector = new CustomMessageInspector();
     var behavior = new CustomEndpointBehavior(clientInspector);
+
+    _serviceCache = new OnvifServiceCache(_binding, username, password);
   }
 
   private async Task InitAsync()
@@ -159,7 +165,7 @@ public class Camera
 
     if (services != null)
     {
-      return await OnvifServiceSelector.TryCreateService<MediaService>(services, _binding, _username, _password);
+      return await _serviceCache.GetServiceAsync<MediaService>(services);
     }
     return null;
   }
@@ -181,7 +187,8 @@ public class Camera
 
     if (services != null)
     {
-      return await OnvifServiceSelector.TryCreateService<PtzService2>(services, _binding, _username, _password);
+      var service = await _serviceCache.GetServiceAsync<PtzService2>(services);
+      return service;
     }
     return null;
   }
