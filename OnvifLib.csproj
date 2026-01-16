@@ -9,11 +9,11 @@
     <PackageId>OnvifLib</PackageId>
     <Version>1.0.4</Version>
     <Authors>Danil Serov</Authors>
-    <Company>Danil Serov</Company>
+    <Company>TreeAlarm</Company>
     <Description>A modern .NET library for interacting with ONVIF-compliant IP cameras (discovery, media, PTZ, events).</Description>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/yourname/OnvifLib</RepositoryUrl>
+    <RepositoryUrl>https://github.com/treealarm/OnvifLib</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
   </PropertyGroup>
   <ItemGroup>
