@@ -36,20 +36,27 @@ namespace OnvifLib
       var profilesResponse = await _mediaClient2.GetProfilesAsync(request);
 
       _profiles = profilesResponse.Profiles.ToList();
-
-      foreach (var profile in _profiles)
-      {
-        var streamUriRequest = new GetStreamUriRequest
-        {
-          Protocol = MediaServiceReference.StreamType.RTPUnicast.ToString(),
-          ProfileToken = profile.token
-        };
-
-        var streamResponse = await _mediaClient2.GetStreamUriAsync(streamUriRequest);
-        Console.WriteLine($"Profile: {profile.Name}, RTSP URL: {streamResponse.Uri}");
-      }
     }
 
+    public override async Task<string> GetStreamUri(string profile_token)
+    {
+      if (_mediaClient2 == null)
+      {
+        return string.Empty;
+      }
+      var profile = _profiles.Where(p => p.token == profile_token).FirstOrDefault();
+      if (profile == null)
+      {
+        return string.Empty;
+      }
+      var streamUriRequest = new GetStreamUriRequest
+      {
+        Protocol = MediaServiceReference.StreamType.RTPUnicast.ToString(),
+        ProfileToken = profile.token
+      };
+      var streamResponse = await _mediaClient2.GetStreamUriAsync(streamUriRequest);
+      return streamResponse.Uri;
+    }
     public override List<string> GetProfiles()
     {
       return _profiles.Select(p=>p.token).ToList();

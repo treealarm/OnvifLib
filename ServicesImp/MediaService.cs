@@ -17,6 +17,11 @@ namespace OnvifLib
     {
       return new List<string>();
     }
+    public virtual async Task<string> GetStreamUri(string profile_token)
+    {
+      await Task.CompletedTask;
+      return string.Empty;
+    }
     public static string? GetExtensionFromMime(string? mime)
     {
       if (string.IsNullOrWhiteSpace(mime))

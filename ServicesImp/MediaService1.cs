@@ -1,6 +1,7 @@
 ﻿using System.ServiceModel.Channels;
 using System.ServiceModel;
 using MediaServiceReference1;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace OnvifLib
 {
@@ -34,22 +35,29 @@ namespace OnvifLib
       var profilesResponse = await _mediaClient1.GetProfilesAsync();
 
       _profiles = profilesResponse.Profiles.ToList();
-
-      foreach (var profile in _profiles)
+    }
+    public override async Task<string> GetStreamUri(string profile_token)
+    {
+      if (_mediaClient1 == null)
       {
-        var streamUriRequest = new StreamSetup
-        {
-          Transport  = new Transport()
-          {
-            Protocol = TransportProtocol.UDP
-          },
-
-          Stream = MediaServiceReference1.StreamType.RTPUnicast
-        };
-
-        var streamResponse = await _mediaClient1.GetStreamUriAsync(streamUriRequest, profile.token);
-        Console.WriteLine($"Profile: {profile.Name}, RTSP URL: {streamResponse.Uri}");
+        return string.Empty;
       }
+      var profile = _profiles.Where(p => p.token == profile_token).FirstOrDefault();
+      if (profile == null)
+      {
+        return string.Empty;
+      }
+      var streamUriRequest = new StreamSetup
+      {
+        Transport = new Transport()
+        {
+          Protocol = TransportProtocol.UDP
+        },
+
+        Stream = MediaServiceReference1.StreamType.RTPUnicast
+      };
+      var streamResponse = await _mediaClient1.GetStreamUriAsync(streamUriRequest, profile.token);
+      return streamResponse.Uri;
     }
     public override List<string> GetProfiles()
     {
