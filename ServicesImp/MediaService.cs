@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Collections.Concurrent;
+using System.Net;
 using System.ServiceModel.Channels;
 
 namespace OnvifLib
@@ -80,15 +81,21 @@ namespace OnvifLib
       return instance;
     }
 
-    public static async Task<ImageResult> DownloadImageAsync(string url, string username, string password, IOnvifLogger? logger = null)
-    {
-      var handler = new HttpClientHandler
+    // One pooled HttpClient per credential pair. Recreating it per snapshot leaked sockets
+    // (each disposed client left connections in TIME_WAIT); these are reused for the app lifetime.
+    private static readonly ConcurrentDictionary<(string User, string Password), HttpClient> _imageClients = new();
+
+    private static HttpClient GetImageClient(string username, string password)
+      => _imageClients.GetOrAdd((username, password), static key => new HttpClient(new SocketsHttpHandler
       {
         PreAuthenticate = true,
-        Credentials = new NetworkCredential(username, password)
-      };
+        Credentials = new NetworkCredential(key.User, key.Password),
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+      }));
 
-      using var client = new HttpClient(handler);
+    public static async Task<ImageResult> DownloadImageAsync(string url, string username, string password, IOnvifLogger? logger = null)
+    {
+      var client = GetImageClient(username, password);
 
       var response = await client.GetAsync(url);
       if (!response.IsSuccessStatusCode)
