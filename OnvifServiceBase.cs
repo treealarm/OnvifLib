@@ -54,7 +54,7 @@ namespace OnvifLib
     }
     protected async Task<System.DateTime> GetDeviceTimeAsync()
     {
-      var deviceClient = _onvifClientFactory.CreateClient<DeviceClient, Device>(
+      using var deviceClient = _onvifClientFactory.CreateClient<DeviceClient, Device>(
         new EndpointAddress(_url),
         _binding,
         _username,

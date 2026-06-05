@@ -164,7 +164,7 @@ namespace OnvifLib
 
     public async Task StartReceivingAsync()
     {
-      await Task.Delay(0);
+      await Task.CompletedTask;
 
       if (_pullClient == null)
         throw new InvalidOperationException("Pull client not initialized");
@@ -294,8 +294,12 @@ namespace OnvifLib
 
     public override void Dispose()
     {
+      // Stop the background receive loop first, otherwise it keeps running on the
+      // closed clients, faults, and tries to re-subscribe to a disposed service.
+      try { _cts?.Cancel(); } catch { }
       try { _eventClient1?.Close(); } catch { }
       try { _pullClient?.Close(); } catch { }
+      try { _subscriptionManagerClient?.Close(); } catch { }
       base.Dispose();
     }
   }

@@ -242,7 +242,7 @@ public class Camera
         || text.Contains("Unauthorized", StringComparison.OrdinalIgnoreCase);
   }
 
-  public static void ParseEvent(string soapXml)
+  public static Notify? ParseEvent(string soapXml)
   {
     var xmlDoc = new XmlDocument();
     xmlDoc.LoadXml(soapXml);
@@ -257,14 +257,6 @@ public class Camera
 
     var serializer = new XmlSerializer(typeof(Notify), "http://docs.oasis-open.org/wsn/b-2");
     using var reader = new XmlNodeReader(notifyNode);
-    var notify =  serializer.Deserialize(reader) as Notify;
-
-    if (notify != null && (notify).NotificationMessage != null)
-    {
-      var n = (notify).NotificationMessage.FirstOrDefault();
-
-      if (n != null)
-        Console.WriteLine("Topic: " + (n).Topic.Any);
-    }    
+    return serializer.Deserialize(reader) as Notify;
   }
 }

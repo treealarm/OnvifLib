@@ -61,7 +61,7 @@ namespace OnvifLib
             byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
 
             byte[] aggregationBytes = nonceBytes.Concat(createdTimeBytes).Concat(passwordBytes).ToArray();
-            byte[] hashBytes = SHA1.Create().ComputeHash(aggregationBytes);
+            byte[] hashBytes = SHA1.HashData(aggregationBytes);
 
             return Convert.ToBase64String(hashBytes);
         }

@@ -55,7 +55,9 @@ namespace OnvifLib
 
       var streamUriRequest = new GetStreamUriRequest
       {
-        Protocol = MediaServiceReference.StreamType.RTPUnicast.ToString(),
+        // Media2 GetStreamUri.Protocol is a transport value ("RtspUnicast", "RtspMulticast",
+        // "RTSP", "RtspOverHttp") — not the Media1 StreamType enum ("RTPUnicast").
+        Protocol = "RtspUnicast",
         ProfileToken = profile.token
       };
       var streamResponse = await _mediaClient2.GetStreamUriAsync(streamUriRequest);

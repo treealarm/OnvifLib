@@ -26,9 +26,13 @@ namespace OnvifLib
 
     public IEnumerator<IPAddress> GetEnumerator()
     {
-      for (uint ip = _start; ip <= _end; ip++)
+      // Note: iterate with a break on _end rather than `ip <= _end`, otherwise
+      // _end == uint.MaxValue (255.255.255.255) overflows ip++ back to 0 and loops forever.
+      for (uint ip = _start; ; ip++)
       {
         yield return UintToIp(ip);
+        if (ip == _end)
+          yield break;
       }
     }
 

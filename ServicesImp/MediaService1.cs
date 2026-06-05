@@ -1,7 +1,6 @@
 ﻿using System.ServiceModel.Channels;
 using System.ServiceModel;
 using MediaServiceReference1;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace OnvifLib
 {
