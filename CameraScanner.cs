@@ -29,7 +29,7 @@ namespace OnvifLib
       var existingUrls = existing.Select(c => c.Url).ToHashSet();
 
 
-      // Параллельная обработка всех комбинаций
+      // Parallel probe of IP × port × credential combinations
       await Parallel.ForEachAsync(ipRange, new ParallelOptions { MaxDegreeOfParallelism = 16, CancellationToken = token }, async (ip, ct) =>
       {
         foreach (var port in ports)

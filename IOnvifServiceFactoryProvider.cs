@@ -10,6 +10,6 @@ namespace OnvifLib
   public interface IOnvifServiceFactory<T> where T : class
   {
     static abstract string[] GetSupportedWsdls();
-    static abstract Task<T?> CreateAsync(string url, CustomBinding binding, string username, string password, string wsdlKey);
+    static abstract Task<T?> CreateAsync(string url, CustomBinding binding, string username, string password, string wsdlKey, Func<SecurityToken>? tokenFactory = null, IOnvifLogger? logger = null);
   }
 }

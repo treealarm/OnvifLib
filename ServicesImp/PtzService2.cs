@@ -8,9 +8,8 @@ namespace OnvifLib
   {
     public const string WSDL_V20 = "http://www.onvif.org/ver20/ptz/wsdl";
     private PTZClient? _ptzClient;
-    private Capabilities? _caps;
-    protected PtzService2(string url, CustomBinding binding, string username, string password, string profile) :
-      base(url, binding, username, password, profile)
+    protected PtzService2(string url, CustomBinding binding, string username, string password, string profile, Func<SecurityToken>? tokenFactory = null, IOnvifLogger? logger = null) :
+      base(url, binding, username, password, profile, tokenFactory, logger)
     {
     }
 
@@ -18,9 +17,9 @@ namespace OnvifLib
     {
       return new[] { WSDL_V20 };
     }
-    public static async Task<PtzService2?> CreateAsync(string url, CustomBinding binding, string username, string password, string profile)
+    public static async Task<PtzService2?> CreateAsync(string url, CustomBinding binding, string username, string password, string profile, Func<SecurityToken>? tokenFactory = null, IOnvifLogger? logger = null)
     {
-      var instance = new PtzService2(url, binding, username, password, profile);
+      var instance = new PtzService2(url, binding, username, password, profile, tokenFactory, logger);
       await instance.InitializeAsync();
       return instance;
     }
@@ -34,12 +33,36 @@ namespace OnvifLib
         _username, 
         _password);
       await _ptzClient.OpenAsync();
-      _caps = await _ptzClient.GetServiceCapabilitiesAsync();
     }
 
-    public bool SupportedCaps()
+    public bool SupportedCaps() => true;
+
+    public async Task<PtzCapabilities> GetCapabilitiesAsync(string profileToken)
     {
-      return true;
+      if (_ptzClient == null)
+        return new PtzCapabilities(false, false, false);
+
+      try
+      {
+        // GetConfigurations is more reliable than GetNodes:
+        // DefaultXxxSpace is null when the camera hasn't actually configured that move mode,
+        // whereas GetNodes.SupportedPTZSpaces can list spaces the camera doesn't truly implement.
+        var cfgResp = await _ptzClient.GetConfigurationsAsync();
+        var configs = cfgResp.PTZConfiguration;
+        if (configs == null || configs.Length == 0)
+          return new PtzCapabilities(false, false, false);
+
+        return new PtzCapabilities(
+          AbsoluteMove:   configs.Any(c => !string.IsNullOrEmpty(c.DefaultAbsolutePantTiltPositionSpace)),
+          RelativeMove:   configs.Any(c => !string.IsNullOrEmpty(c.DefaultRelativePanTiltTranslationSpace)),
+          ContinuousMove: configs.Any(c => !string.IsNullOrEmpty(c.DefaultContinuousPanTiltVelocitySpace))
+        );
+      }
+      catch (Exception ex)
+      {
+        _logger?.Error($"ONVIF GetCapabilities failed for {_url}: {ex}");
+        return new PtzCapabilities(false, false, false);
+      }
     }
     public async Task AbsoluteMoveAsync(string profileToken, float panTiltX, float panTiltY, float zoom = 0f, float speedPanTilt = 0.5f, float speedZoom = 0.5f)
     {
@@ -66,7 +89,7 @@ namespace OnvifLib
       float panTiltX, 
       float panTiltY, 
       float zoom = 0f, 
-      string timeout = "PT1S")
+      string timeout = "PT3S")
     {
       if (_ptzClient == null)
         throw new InvalidOperationException("PTZ client not initialized");
@@ -120,4 +143,6 @@ namespace OnvifLib
       base.Dispose();
     }
   }
+
+  public record PtzCapabilities(bool AbsoluteMove, bool RelativeMove, bool ContinuousMove);
 }

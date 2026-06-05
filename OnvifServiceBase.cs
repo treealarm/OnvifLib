@@ -12,35 +12,44 @@ namespace OnvifLib
     protected readonly CustomBinding _binding;
     protected readonly string _profile;
     protected readonly OnvifClientFactory _onvifClientFactory;
-    protected OnvifServiceBase(string url, CustomBinding binding, string username, string password, string profile)
+    protected readonly IOnvifLogger? _logger;
+    private readonly Func<SecurityToken>? _tokenFactory;
+
+    protected OnvifServiceBase(string url, CustomBinding binding, string username, string password, string profile, Func<SecurityToken>? tokenFactory = null, IOnvifLogger? logger = null)
     {
       _url = url;
       _binding = binding;
       _username = username;
       _password = password;
       _profile = profile;
-      _onvifClientFactory = new OnvifClientFactory();
+      _logger = logger;
+      _onvifClientFactory = new OnvifClientFactory(logger);
+      _tokenFactory = tokenFactory;
     }
     protected virtual async Task InitializeAsync()
     {
       try
       {
-        System.DateTime deviceTime = await GetDeviceTimeAsync();
+        if (string.IsNullOrEmpty(_username))
+          return;
 
-        if (!string.IsNullOrEmpty(_username))
+        SecurityToken token;
+        if (_tokenFactory != null)
         {
-          byte[] nonceBytes = new byte[20];
-          var random = new Random();
-          random.NextBytes(nonceBytes);
-
-          var token = new SecurityToken(deviceTime, nonceBytes);
-
-          _onvifClientFactory.SetSecurityToken(token);
+          token = _tokenFactory();
         }
+        else
+        {
+          var deviceTime = await GetDeviceTimeAsync();
+          var nonce = new byte[20];
+          Random.Shared.NextBytes(nonce);
+          token = new SecurityToken(deviceTime, nonce);
+        }
+        _onvifClientFactory.SetSecurityToken(token);
       }
       catch (Exception ex)
       {
-        _ = ex;
+        _logger?.Error($"ONVIF service initialization failed for {_url}: {ex}");
       }
     }
     protected async Task<System.DateTime> GetDeviceTimeAsync()

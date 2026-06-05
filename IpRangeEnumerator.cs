@@ -38,7 +38,7 @@ namespace OnvifLib
     {
       byte[] bytes = ip.GetAddressBytes();
       if (BitConverter.IsLittleEndian)
-        Array.Reverse(bytes); // в big-endian
+        Array.Reverse(bytes); // network byte order (big-endian uint)
       return BitConverter.ToUInt32(bytes, 0);
     }
 

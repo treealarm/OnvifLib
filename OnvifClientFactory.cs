@@ -4,7 +4,7 @@ using System.ServiceModel;
 
 namespace OnvifLib
 {
-  public class OnvifClientFactory
+  public class OnvifClientFactory(IOnvifLogger? logger = null)
   {
     private SecurityToken? _securityToken = null;
     public TClient CreateClient<TClient, TInterface>(
@@ -15,12 +15,12 @@ namespace OnvifLib
         where TInterface : class
         where TClient : ClientBase<TInterface>, TInterface
     {
-      var clientInspector = new CustomMessageInspector();
+      var clientInspector = new CustomMessageInspector(logger);
       var behavior = new CustomEndpointBehavior(clientInspector);
 
       var client = (TClient)Activator.CreateInstance(typeof(TClient), binding, endpoint)!;
 
-      // Установка данных авторизации
+      // Configure digest / username credentials on the client
       client.ClientCredentials.UserName.UserName = username;
       client.ClientCredentials.UserName.Password = password;
 

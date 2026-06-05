@@ -3,19 +3,27 @@ using System.ServiceModel.Channels;
 
 namespace OnvifLib
 {
+  public record OnvifProfileInfo(
+    string Token,
+    string Name,
+    int Width,
+    int Height,
+    string Encoding
+  );
+
   public class ImageResult
   {
     public byte[] Data { get; set; } = [];
-    public string? Extension { get; set; } // или без точки: "jpeg"
+    public string? Extension { get; set; } // with or without dot, e.g. "jpeg"
     public string? MimeType { get; set; }
   }
   public class MediaService : OnvifServiceBase, IOnvifServiceFactory<MediaService>
   {
     public const string WSDL_V10 = "http://www.onvif.org/ver10/media/wsdl";
     public const string WSDL_V20 = "http://www.onvif.org/ver20/media/wsdl";
-    public virtual List<string> GetProfiles()
+    public virtual List<OnvifProfileInfo> GetProfiles()
     {
-      return new List<string>();
+      return [];
     }
     public virtual async Task<string> GetStreamUri(string profile_token)
     {
@@ -31,17 +39,18 @@ namespace OnvifLib
       if (parts.Length != 2)
         return null;
 
-      return "." + parts[1]; // например, "image/jpeg" → ".jpeg"
+      return "." + parts[1]; // e.g. "image/jpeg" → ".jpeg"
     }
 
     protected MediaService(
-      string url, 
-      CustomBinding binding, 
-      string username, 
-      string password, 
-      string profile): base(url, binding, username, password, profile) 
+      string url,
+      CustomBinding binding,
+      string username,
+      string password,
+      string profile,
+      Func<SecurityToken>? tokenFactory = null,
+      IOnvifLogger? logger = null) : base(url, binding, username, password, profile, tokenFactory, logger)
     {
-
     }
 
 
@@ -51,25 +60,27 @@ namespace OnvifLib
     }
 
     public static async Task<MediaService?> CreateAsync(
-      string url, 
-      CustomBinding binding, 
-      string username, 
+      string url,
+      CustomBinding binding,
+      string username,
       string password,
-      string profile)
+      string profile,
+      Func<SecurityToken>? tokenFactory = null,
+      IOnvifLogger? logger = null)
     {
       if (profile == WSDL_V10)
       {
-        var instance1 = new MediaService1(url, binding, username, password, profile);
+        var instance1 = new MediaService1(url, binding, username, password, profile, tokenFactory, logger);
         await instance1.InitializeAsync();
         return instance1;
       }
-      
-      var instance = new MediaService2(url, binding, username, password, profile);
+
+      var instance = new MediaService2(url, binding, username, password, profile, tokenFactory, logger);
       await instance.InitializeAsync();
       return instance;
     }
 
-    public static async Task<ImageResult> DownloadImageAsync(string url, string username, string password)
+    public static async Task<ImageResult> DownloadImageAsync(string url, string username, string password, IOnvifLogger? logger = null)
     {
       var handler = new HttpClientHandler
       {
@@ -80,6 +91,11 @@ namespace OnvifLib
       using var client = new HttpClient(handler);
 
       var response = await client.GetAsync(url);
+      if (!response.IsSuccessStatusCode)
+      {
+        var body = await response.Content.ReadAsStringAsync();
+        logger?.Error($"ONVIF snapshot download failed: HTTP {(int)response.StatusCode} {response.ReasonPhrase} for {url}. Body: {body}");
+      }
       response.EnsureSuccessStatusCode();
 
       var mime = response.Content.Headers.ContentType?.MediaType;
