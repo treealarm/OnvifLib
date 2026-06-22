@@ -9,8 +9,55 @@ namespace OnvifLib
     string Name,
     int Width,
     int Height,
-    string Encoding
+    string Encoding,
+    string VideoSourceToken = ""
   );
+
+  public record OnvifVideoEncoderConfig(
+    string Token,
+    string Name,
+    string Encoding,
+    int Width,
+    int Height,
+    int FrameRateLimit,
+    int BitrateLimit,
+    int GovLength,
+    string H264Profile,
+    float Quality);
+
+  public record OnvifResolutionOption(int Width, int Height);
+
+  public record OnvifVideoEncoderOptions(
+    string Encoding,
+    List<OnvifResolutionOption> Resolutions,
+    int MinFrameRate,
+    int MaxFrameRate,
+    int MinBitrate,
+    int MaxBitrate,
+    int MinGovLength,
+    int MaxGovLength,
+    List<string> H264Profiles);
+
+  public record OnvifAudioEncoderConfig(
+    string Token,
+    string Name,
+    string Encoding,
+    int    Bitrate,
+    int    SampleRate);
+
+  public record OnvifAudioEncoderOption(
+    string    Encoding,
+    List<int> Bitrates,
+    List<int> SampleRates);
+
+  public record OnvifDeviceInfo(
+    string Manufacturer,
+    string Model,
+    string FirmwareVersion,
+    string SerialNumber,
+    string HardwareId);
+
+  public record OnvifCapabilities(bool HasPtz, bool HasImaging, bool HasEvents);
 
   public class ImageResult
   {
@@ -22,15 +69,44 @@ namespace OnvifLib
   {
     public const string WSDL_V10 = "http://www.onvif.org/ver10/media/wsdl";
     public const string WSDL_V20 = "http://www.onvif.org/ver20/media/wsdl";
+
+    // Shared between Media v1/v2 — stream URIs don't change for the lifetime of a profile.
+    private readonly Dictionary<string, string> _streamUriCache = new();
+
     public virtual List<OnvifProfileInfo> GetProfiles()
     {
       return [];
     }
-    public virtual async Task<string> GetStreamUri(string profile_token)
+
+    public async Task<string> GetStreamUri(string profile_token)
+    {
+      if (_streamUriCache.TryGetValue(profile_token, out var cached))
+        return cached;
+
+      var uri = await ResolveStreamUriAsync(profile_token);
+      if (!string.IsNullOrEmpty(uri))
+        _streamUriCache[profile_token] = uri;
+      return uri;
+    }
+
+    protected virtual async Task<string> ResolveStreamUriAsync(string profile_token)
     {
       await Task.CompletedTask;
       return string.Empty;
     }
+
+    public virtual Task<List<OnvifVideoEncoderConfig>> GetVideoEncoderConfigsAsync()
+      => Task.FromResult<List<OnvifVideoEncoderConfig>>([]);
+    public virtual Task<List<OnvifVideoEncoderOptions>> GetVideoEncoderConfigOptionsAsync(string configToken)
+      => Task.FromResult<List<OnvifVideoEncoderOptions>>([]);
+    public virtual Task SetVideoEncoderConfigAsync(OnvifVideoEncoderConfig config)
+      => Task.CompletedTask;
+    public virtual Task<List<OnvifAudioEncoderConfig>> GetAudioEncoderConfigsAsync()
+      => Task.FromResult<List<OnvifAudioEncoderConfig>>([]);
+    public virtual Task<List<OnvifAudioEncoderOption>> GetAudioEncoderConfigOptionsAsync(string configToken)
+      => Task.FromResult<List<OnvifAudioEncoderOption>>([]);
+    public virtual Task SetAudioEncoderConfigAsync(OnvifAudioEncoderConfig config)
+      => Task.CompletedTask;
     public static string? GetExtensionFromMime(string? mime)
     {
       if (string.IsNullOrWhiteSpace(mime))
@@ -111,7 +187,24 @@ namespace OnvifLib
       return new ImageResult()
       { Data = data, Extension = GetExtensionFromMime(mime), MimeType = mime};
     }
-    public virtual async Task<ImageResult?> GetImage()
+    public async Task<ImageResult?> GetImage()
+    {
+      var snapshotUri = await GetSnapshotUriAsync();
+      if (string.IsNullOrEmpty(snapshotUri))
+        return null;
+
+      try
+      {
+        return await DownloadImageAsync(snapshotUri, _username, _password, _logger);
+      }
+      catch (Exception ex)
+      {
+        _logger?.Error($"ONVIF GetImage failed for {_url}: {ex}");
+        return null;
+      }
+    }
+
+    protected virtual async Task<string?> GetSnapshotUriAsync()
     {
       await Task.CompletedTask;
       return null;

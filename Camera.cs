@@ -94,6 +94,40 @@ public class Camera
     );
   }
 
+  public async Task<string> RebootAsync()
+  {
+    using var device = await GetDevice();
+    return await device.SystemRebootAsync();
+  }
+
+  public async Task<OnvifDeviceInfo> GetDeviceInformationAsync()
+  {
+    using var device = await GetDevice();
+    var resp = await device.GetDeviceInformationAsync(new DeviceServiceReference.GetDeviceInformationRequest());
+    return new OnvifDeviceInfo(
+      resp.Manufacturer ?? string.Empty,
+      resp.Model ?? string.Empty,
+      resp.FirmwareVersion ?? string.Empty,
+      resp.SerialNumber ?? string.Empty,
+      resp.HardwareId ?? string.Empty);
+  }
+
+  public async Task SyncTimeAsync() => await SetTimeAsync(System.DateTime.UtcNow);
+
+  public async Task SetTimeAsync(System.DateTime utcTime)
+  {
+    using var device = await GetDevice();
+    await device.SetSystemDateAndTimeAsync(
+      SetDateTimeType.Manual,
+      false,
+      null,
+      new DeviceServiceReference.DateTime
+      {
+        Date = new Date { Year = utcTime.Year, Month = utcTime.Month, Day = utcTime.Day },
+        Time = new Time { Hour = utcTime.Hour, Minute = utcTime.Minute, Second = utcTime.Second },
+      });
+  }
+
   public string Url { get { return _url; } }
   public string User { get { return _username; } }
   public string Password { get { return _password; } }
@@ -101,20 +135,26 @@ public class Camera
   public int Port { get { return _port; } }
 
   //http://192.168.1.150:8899/onvif/device_service
-  public static  string CreateUrl(string ip, int port)
+  public static string CreateUrl(string ip, int port, string? xaddr = null)
   {
-    return $"http://{ip}:{port}/onvif/device_service";
+    // Prefer the address actually discovered (WS-Discovery XAddr) over the standard
+    // template — some devices serve their device_service at a non-standard path.
+    return string.IsNullOrEmpty(xaddr) ? $"http://{ip}:{port}/onvif/device_service" : xaddr;
   }
 
-  public static Camera Create(string ip, int port, string username, string password, double timeout = 15, IOnvifLogger? logger = null)
+  public static Camera Create(
+    string ip, int port, string username, string password,
+    double timeout = 15, IOnvifLogger? logger = null, string? xaddr = null)
   {
-    var cam = new Camera(ip, port, username, password, timeout, logger);
+    var cam = new Camera(ip, port, username, password, timeout, logger, xaddr);
     cam.InitTask = cam.InitAsync(); // start initialization in the background
     return cam;
   }
-  private Camera(string ip, int port, string username, string password, double timeout, IOnvifLogger? logger = null)
+  private Camera(
+    string ip, int port, string username, string password,
+    double timeout, IOnvifLogger? logger = null, string? xaddr = null)
   {
-    _url = CreateUrl(ip, port);
+    _url = CreateUrl(ip, port, xaddr);
     _ip = ip;
     _username = username;
     _password = password;
@@ -122,7 +162,7 @@ public class Camera
     _logger = logger;
 
     _onvifClientFactory = new OnvifClientFactory(logger);
-    _bindingProvider = new CustomBindingProvider(timeout);
+    _bindingProvider = new CustomBindingProvider(timeout, cacheKey: _url);
     _serviceCache = new OnvifServiceCache(_bindingProvider, username, password, MakeSecurityToken, logger: logger);
   }
 
@@ -190,6 +230,17 @@ public class Camera
     return null;
   }
 
+  async public Task<ImagingService2?> GetImagingService()
+  {
+    var services = await GetServicesAsync();
+
+    if (services != null)
+    {
+      return await _serviceCache.GetServiceAsync<ImagingService2>(services);
+    }
+    return null;
+  }
+
   async public Task<List<OnvifProfileInfo>?> GetProfiles()
   {
     var service = await GetMediaService();
@@ -202,18 +253,64 @@ public class Camera
     var services = await GetServicesAsync();
     return (services != null && services.Count > 0);
   }
+
+  private OnvifCapabilities? _capabilitiesCache;
+  private System.DateTime _capabilitiesCacheAt = System.DateTime.MinValue;
+  private static readonly TimeSpan CapabilitiesCacheTtl = TimeSpan.FromMinutes(5);
+
+  // HasImaging/HasEvents are derived purely from namespace presence in the
+  // Device.GetServicesAsync(true) (IncludeCapability) dictionary — no extra SOAP call needed,
+  // since that's the same information ONVIF's GetCapabilities call would expose (XAddr per
+  // category). HasPtz is the exception: namespace presence alone isn't reliable for PTZ (some
+  // cameras advertise the PTZ WSDL without any real move hardware behind it), so it costs one
+  // extra GetConfigurations round trip — cached below since this method is polled frequently
+  // by UI capability checks.
+  public async Task<OnvifCapabilities> GetCapabilitiesSummaryAsync()
+  {
+    if (_capabilitiesCache != null && System.DateTime.UtcNow - _capabilitiesCacheAt < CapabilitiesCacheTtl)
+      return _capabilitiesCache;
+
+    var services = await GetServicesAsync();
+    if (services == null)
+      return new OnvifCapabilities(false, false, false);
+
+    // GetConfigurations (not GetNodes) is the reliable PTZ signal — same reasoning as
+    // PtzService2.GetCapabilitiesAsync's own comment.
+    var hasPtz = false;
+    if (services.ContainsKey(PtzService2.WSDL_V20))
+    {
+      var ptz = await GetPtzService();
+      if (ptz != null)
+      {
+        var ptzCaps = await ptz.GetCapabilitiesAsync(string.Empty);
+        hasPtz = ptzCaps.AbsoluteMove || ptzCaps.RelativeMove || ptzCaps.ContinuousMove;
+      }
+    }
+
+    var result = new OnvifCapabilities(
+      HasPtz:     hasPtz,
+      HasImaging: services.ContainsKey(ImagingService2.WSDL_V20),
+      // Mirror GetEventService()'s own resolution (OnvifServiceSelector tries every WSDL in
+      // EventService1.GetSupportedWsdls()) — some cameras advertise events only under the
+      // media namespace, with no separate dedicated events entry.
+      HasEvents:  EventService1.GetSupportedWsdls().Any(services.ContainsKey));
+
+    _capabilitiesCache = result;
+    _capabilitiesCacheAt = System.DateTime.UtcNow;
+    return result;
+  }
   private async Task<Dictionary<string, string>?> DoGetServices()
   {
     try
     {
       using var client = await GetDevice();
       var result = await client.GetServicesAsync(true);
+      _bindingProvider.RememberWorking();
       return result.Service.ToDictionary(s => s.Namespace, s => s.XAddr);
     }
-    catch (Exception ex) when (!_bindingProvider.IsDigest && IsAuthError(ex))
+    catch (Exception ex) when (IsAuthError(ex) && SwitchAuthScheme(ex))
     {
-      // Camera requires HTTP Digest auth — switch once and retry
-      _bindingProvider.SwitchToDigest();
+      // Camera challenged with a different auth scheme (Basic/Digest) — switch and retry once.
       _serviceCache = new OnvifServiceCache(_bindingProvider, _username, _password, MakeSecurityToken, logger: _logger);
       _onvifClientFactory.SetSecurityToken(null);
       _tokenExpiry = System.DateTime.UtcNow;
@@ -221,6 +318,7 @@ public class Camera
       {
         using var client = await GetDevice();
         var result = await client.GetServicesAsync(true);
+        _bindingProvider.RememberWorking();
         return result.Service.ToDictionary(s => s.Namespace, s => s.XAddr);
       }
       catch (Exception retryEx)
@@ -234,6 +332,19 @@ public class Camera
       _logger?.Error(ex.ToString());
       return null;
     }
+  }
+
+  /// <summary>
+  /// Switches the binding to the auth scheme the camera challenged for (Basic/Digest),
+  /// or falls back to Digest once if the challenge didn't name a scheme. Returns false
+  /// if the binding is already on the requested scheme (nothing to retry with).
+  /// </summary>
+  private bool SwitchAuthScheme(Exception ex)
+  {
+    if (_bindingProvider.TrySwitchToChallenged(ex))
+      return true;
+
+    return !_bindingProvider.IsDigest && _bindingProvider.SwitchToDigest();
   }
 
   private static bool IsAuthError(Exception? ex)

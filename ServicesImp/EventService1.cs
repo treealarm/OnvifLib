@@ -19,15 +19,28 @@ namespace OnvifLib
     // ONVIF long-poll duration: the camera holds each PullMessages request up to this long
     // waiting for an event (returns immediately when one arrives). Must stay well below the
     // WCF ReceiveTimeout (CustomBindingProvider) and the subscription TTL above.
-    private readonly TimeSpan _pullTimeout = TimeSpan.FromSeconds(5);
+    public TimeSpan PullTimeout { get; set; } = TimeSpan.FromSeconds(5);
+    public int MessageLimit { get; set; } = 1024;
     private SubscriptionManagerClient? _subscriptionManagerClient;
     private DateTime _subscriptionExpiry;
+
+    // Bindings used for the device-service endpoint (CreatePullPointSubscription) and the
+    // pull-point endpoint (PullMessages/Renew/Unsubscribe) — the two can require different
+    // HTTP auth schemes (e.g. device service via Digest, events via Basic). Each remembers
+    // the working scheme in AuthSchemeCache so re-subscribes don't repeat a failed scheme.
+    private readonly CustomBindingProvider _deviceBindingProvider;
+    private CustomBindingProvider? _pullBindingProvider;
+    private readonly double _bindingTimeoutSeconds;
+    private bool _authSchemeConfirmed;
 
     public event Action<NotificationMessageHolderType[]>? OnEventReceived;
 
     protected EventService1(string url, CustomBinding binding, string username, string password, string profile, Func<SecurityToken>? tokenFactory = null, IOnvifLogger? logger = null) :
       base(url, binding, username, password, profile, tokenFactory, logger)
     {
+      _bindingTimeoutSeconds = binding.OpenTimeout.TotalSeconds;
+      var initialScheme = AuthSchemeCache.TryGet(url) ?? CustomBindingProvider.SchemeOf(binding);
+      _deviceBindingProvider = new CustomBindingProvider(_bindingTimeoutSeconds, initialScheme, url);
     }
 
     public static string[] GetSupportedWsdls()
@@ -50,7 +63,7 @@ namespace OnvifLib
 
       _eventClient1 = _onvifClientFactory.CreateClient<EventPortTypeClient, EventPortType>(
         new EndpointAddress(_url),
-        _binding,
+        _deviceBindingProvider.Current,
         _username,
         _password);
       await _eventClient1.OpenAsync();
@@ -80,15 +93,25 @@ namespace OnvifLib
 
       _pullPointAddress = new EndpointAddress(subscriptionUri, headers.ToArray());
 
+      // The pull-point endpoint may require a different auth scheme than the device
+      // service (e.g. Basic vs Digest). Cache key is the pull-point URI so a known-working
+      // scheme survives across re-subscribes that return the same address.
+      var pullCacheKey = subscriptionUri.ToString();
+      if (_pullBindingProvider == null)
+      {
+        var pullInitialScheme = AuthSchemeCache.TryGet(pullCacheKey) ?? _deviceBindingProvider.Scheme;
+        _pullBindingProvider = new CustomBindingProvider(_bindingTimeoutSeconds, pullInitialScheme, pullCacheKey);
+      }
+
       _pullClient = _onvifClientFactory.CreateClient<PullPointSubscriptionClient, PullPointSubscription>(
         _pullPointAddress,
-        _binding,
+        _pullBindingProvider.Current,
         _username,
         _password);
 
       _subscriptionManagerClient = _onvifClientFactory.CreateClient<SubscriptionManagerClient, SubscriptionManager>(
         _pullPointAddress,
-        _binding,
+        _pullBindingProvider.Current,
         _username,
         _password);
 
@@ -113,7 +136,7 @@ namespace OnvifLib
       try { _eventClient1?.Abort(); } catch { }
       _eventClient1 = _onvifClientFactory.CreateClient<EventPortTypeClient, EventPortType>(
         new EndpointAddress(_url),
-        _binding,
+        _deviceBindingProvider.Current,
         _username,
         _password);
       await _eventClient1.OpenAsync();
@@ -204,11 +227,19 @@ namespace OnvifLib
 
           var request = new PullMessagesRequest
           {
-            Timeout = XmlConvert.ToString(_pullTimeout),
-            MessageLimit = 1024
+            Timeout = XmlConvert.ToString(PullTimeout),
+            MessageLimit = MessageLimit
           };
 
+          var pullStarted = DateTime.UtcNow;
           var response = await _pullClient!.PullMessagesAsync(request);
+
+          if (!_authSchemeConfirmed)
+          {
+            _pullBindingProvider?.RememberWorking();
+            _deviceBindingProvider.RememberWorking();
+            _authSchemeConfirmed = true;
+          }
 
           if (response?.NotificationMessage == null)
           {
@@ -217,6 +248,8 @@ namespace OnvifLib
           }
           else
           {
+            // Dispatch immediately, before the throttle delay below — alarms/events must not
+            // wait out PullTimeout before CheckAndTriggerAlarmAsync records AlarmStartTs.
             // Dispatch separately: a throwing consumer is the caller's bug, not a
             // pull/renew failure, and must not trigger the reconnect backoff below.
             try
@@ -228,6 +261,16 @@ namespace OnvifLib
               _logger?.Error($"OnEventReceived handler threw for {_url}: {ex}");
             }
           }
+
+          // Some firmware ignores the long-poll Timeout above and returns immediately
+          // regardless of whether events are pending. Without a floor here, such a camera
+          // drives this loop at full speed (thousands of iterations/sec), starving the
+          // process' thread pool. Enforce PullTimeout as a minimum cadence regardless of
+          // how fast the camera actually responds — applied after dispatch, so it only
+          // delays the next pull, never the event we just received.
+          var elapsed = DateTime.UtcNow - pullStarted;
+          if (elapsed < PullTimeout)
+            await Task.Delay(PullTimeout - elapsed, token);
 
           if (DateTime.UtcNow + _terminationTime / 2 >= _subscriptionExpiry && _subscriptionManagerClient != null)
           {
@@ -241,8 +284,24 @@ namespace OnvifLib
         catch (Exception ex)
         {
           // Pull or renew failed — the pull point is likely terminated/invalid.
+          // If the camera challenged with a different auth scheme (e.g. Basic instead of
+          // Anonymous/Digest), switch to it now so the re-subscribe below uses it — and
+          // it gets remembered for next time via AuthSchemeCache.
+          var switchedScheme =
+            (_pullBindingProvider?.TrySwitchToChallenged(ex) ?? false) |
+            _deviceBindingProvider.TrySwitchToChallenged(ex);
+
+          if (switchedScheme)
+          {
+            _authSchemeConfirmed = false;
+            _logger?.Warning($"Auth scheme rejected for {_url}, switching and re-subscribing: {ex.Message}");
+          }
+          else
+          {
+            _logger?.Error($"Pull/Renew failed for {_url}, will re-subscribe: {ex.Message}");
+          }
+
           // Force a full re-subscribe on the next iteration instead of hammering a dead endpoint.
-          _logger?.Error($"Pull/Renew failed for {_url}, will re-subscribe: {ex.Message}");
           needsResubscribe = true;
           await Task.Delay(2000);
         }

@@ -8,7 +8,6 @@ namespace OnvifLib
   {
     private MediaClient? _mediaClient1;
     private List<Profile> _profiles = new();
-    private readonly Dictionary<string, string> _streamUriCache = new();
 
     public MediaService1(
       string url,
@@ -37,11 +36,8 @@ namespace OnvifLib
 
       _profiles = profilesResponse.Profiles.ToList();
     }
-    public override async Task<string> GetStreamUri(string profile_token)
+    protected override async Task<string> ResolveStreamUriAsync(string profile_token)
     {
-      if (_streamUriCache.TryGetValue(profile_token, out var cached))
-        return cached;
-
       if (_mediaClient1 == null)
         return string.Empty;
 
@@ -55,10 +51,7 @@ namespace OnvifLib
         Stream = MediaServiceReference1.StreamType.RTPUnicast
       };
       var streamResponse = await _mediaClient1.GetStreamUriAsync(streamUriRequest, profile.token);
-      var uri = streamResponse.Uri ?? string.Empty;
-      if (!string.IsNullOrEmpty(uri))
-        _streamUriCache[profile_token] = uri;
-      return uri;
+      return streamResponse.Uri ?? string.Empty;
     }
     public override List<OnvifProfileInfo> GetProfiles()
     {
@@ -67,26 +60,166 @@ namespace OnvifLib
         Name: p.Name ?? p.token,
         Width: p.VideoEncoderConfiguration?.Resolution?.Width ?? 0,
         Height: p.VideoEncoderConfiguration?.Resolution?.Height ?? 0,
-        Encoding: p.VideoEncoderConfiguration?.Encoding.ToString() ?? string.Empty
+        Encoding: p.VideoEncoderConfiguration?.Encoding.ToString() ?? string.Empty,
+        VideoSourceToken: p.VideoSourceConfiguration?.token ?? string.Empty
       )).ToList();
     }
-    public override async Task<ImageResult?> GetImage()
+    public override async Task<List<OnvifVideoEncoderConfig>> GetVideoEncoderConfigsAsync()
+    {
+      if (_mediaClient1 == null) return [];
+      var resp = await _mediaClient1.GetVideoEncoderConfigurationsAsync();
+      return (resp.Configurations ?? []).Select(c => new OnvifVideoEncoderConfig(
+        Token:         c.token ?? string.Empty,
+        Name:          c.Name  ?? string.Empty,
+        Encoding:      c.Encoding.ToString(),
+        Width:         c.Resolution?.Width  ?? 0,
+        Height:        c.Resolution?.Height ?? 0,
+        FrameRateLimit: c.RateControl?.FrameRateLimit ?? 0,
+        BitrateLimit:   c.RateControl?.BitrateLimit   ?? 0,
+        GovLength:     c.H264?.GovLength ?? 0,
+        H264Profile:   c.H264?.H264Profile.ToString() ?? string.Empty,
+        Quality:       c.Quality
+      )).ToList();
+    }
+
+    public override async Task<List<OnvifVideoEncoderOptions>> GetVideoEncoderConfigOptionsAsync(string configToken)
+    {
+      if (_mediaClient1 == null) return [];
+      var opts = await _mediaClient1.GetVideoEncoderConfigurationOptionsAsync(configToken, string.Empty);
+      if (opts == null) return [];
+
+      var result = new List<OnvifVideoEncoderOptions>();
+
+      if (opts.H264 != null)
+      {
+        var h264    = opts.H264;
+        var h264v2  = h264 as MediaServiceReference1.H264Options2;
+        var resolutions = (h264.ResolutionsAvailable ?? [])
+          .Select(r => new OnvifResolutionOption(r.Width, r.Height)).ToList();
+        result.Add(new OnvifVideoEncoderOptions(
+          Encoding:     "H264",
+          Resolutions:  resolutions,
+          MinFrameRate: h264.FrameRateRange?.Min ?? 0,
+          MaxFrameRate: h264.FrameRateRange?.Max ?? 0,
+          MinBitrate:   h264v2?.BitrateRange?.Min ?? 0,
+          MaxBitrate:   h264v2?.BitrateRange?.Max ?? 0,
+          MinGovLength: h264.GovLengthRange?.Min ?? 0,
+          MaxGovLength: h264.GovLengthRange?.Max ?? 0,
+          H264Profiles: (h264.H264ProfilesSupported ?? []).Select(p => p.ToString()).ToList()
+        ));
+      }
+
+      if (opts.JPEG != null)
+      {
+        var jpeg = opts.JPEG;
+        var resolutions = (jpeg.ResolutionsAvailable ?? [])
+          .Select(r => new OnvifResolutionOption(r.Width, r.Height)).ToList();
+        result.Add(new OnvifVideoEncoderOptions(
+          Encoding:     "JPEG",
+          Resolutions:  resolutions,
+          MinFrameRate: jpeg.FrameRateRange?.Min ?? 0,
+          MaxFrameRate: jpeg.FrameRateRange?.Max ?? 0,
+          MinBitrate: 0, MaxBitrate: 0,
+          MinGovLength: 0, MaxGovLength: 0,
+          H264Profiles: []
+        ));
+      }
+
+      if (opts.MPEG4 != null)
+      {
+        var mpeg4 = opts.MPEG4;
+        var resolutions = (mpeg4.ResolutionsAvailable ?? [])
+          .Select(r => new OnvifResolutionOption(r.Width, r.Height)).ToList();
+        result.Add(new OnvifVideoEncoderOptions(
+          Encoding:     "MPEG4",
+          Resolutions:  resolutions,
+          MinFrameRate: mpeg4.FrameRateRange?.Min ?? 0,
+          MaxFrameRate: mpeg4.FrameRateRange?.Max ?? 0,
+          MinBitrate: 0, MaxBitrate: 0,
+          MinGovLength: mpeg4.GovLengthRange?.Min ?? 0,
+          MaxGovLength: mpeg4.GovLengthRange?.Max ?? 0,
+          H264Profiles: []
+        ));
+      }
+
+      return result;
+    }
+
+    public override async Task SetVideoEncoderConfigAsync(OnvifVideoEncoderConfig config)
+    {
+      if (_mediaClient1 == null) return;
+
+      // Fetch existing to preserve unmanaged fields (multicast, session timeout, etc.)
+      var resp = await _mediaClient1.GetVideoEncoderConfigurationsAsync();
+      var existing = (resp.Configurations ?? []).FirstOrDefault(c => c.token == config.Token)
+        ?? throw new InvalidOperationException($"VideoEncoderConfiguration '{config.Token}' not found on camera");
+
+      existing.Resolution = new MediaServiceReference1.VideoResolution { Width = config.Width, Height = config.Height };
+
+      if (existing.RateControl != null)
+      {
+        existing.RateControl.FrameRateLimit = config.FrameRateLimit;
+        existing.RateControl.BitrateLimit   = config.BitrateLimit;
+      }
+
+      if (existing.H264 != null)
+      {
+        if (config.GovLength > 0)
+          existing.H264.GovLength = config.GovLength;
+        if (!string.IsNullOrEmpty(config.H264Profile)
+            && Enum.TryParse<MediaServiceReference1.H264Profile>(config.H264Profile, ignoreCase: true, out var profile))
+          existing.H264.H264Profile = profile;
+      }
+
+      await _mediaClient1.SetVideoEncoderConfigurationAsync(existing, true);
+    }
+
+    public override async Task<List<OnvifAudioEncoderConfig>> GetAudioEncoderConfigsAsync()
+    {
+      if (_mediaClient1 == null) return [];
+      var resp = await _mediaClient1.GetAudioEncoderConfigurationsAsync();
+      return (resp.Configurations ?? []).Select(c => new OnvifAudioEncoderConfig(
+        Token:      c.token      ?? string.Empty,
+        Name:       c.Name       ?? string.Empty,
+        Encoding:   c.Encoding.ToString(),
+        Bitrate:    c.Bitrate,
+        SampleRate: c.SampleRate
+      )).ToList();
+    }
+
+    public override async Task<List<OnvifAudioEncoderOption>> GetAudioEncoderConfigOptionsAsync(string configToken)
+    {
+      if (_mediaClient1 == null) return [];
+      var opts = await _mediaClient1.GetAudioEncoderConfigurationOptionsAsync(configToken, string.Empty);
+      if (opts?.Options == null) return [];
+      return opts.Options.Select(o => new OnvifAudioEncoderOption(
+        Encoding:    o.Encoding.ToString(),
+        Bitrates:    (o.BitrateList    ?? []).ToList(),
+        SampleRates: (o.SampleRateList ?? []).ToList()
+      )).ToList();
+    }
+
+    public override async Task SetAudioEncoderConfigAsync(OnvifAudioEncoderConfig config)
+    {
+      if (_mediaClient1 == null) return;
+      var resp = await _mediaClient1.GetAudioEncoderConfigurationsAsync();
+      var existing = (resp.Configurations ?? []).FirstOrDefault(c => c.token == config.Token)
+        ?? throw new InvalidOperationException($"AudioEncoderConfiguration '{config.Token}' not found on camera");
+      if (Enum.TryParse<MediaServiceReference1.AudioEncoding>(config.Encoding, ignoreCase: true, out var enc))
+        existing.Encoding = enc;
+      existing.Bitrate    = config.Bitrate;
+      existing.SampleRate = config.SampleRate;
+      await _mediaClient1.SetAudioEncoderConfigurationAsync(existing, true);
+    }
+
+    protected override async Task<string?> GetSnapshotUriAsync()
     {
       var profile = _profiles.FirstOrDefault();
       if (profile == null || _mediaClient1 == null)
         return null;
 
-      try
-      {
-        var snapShotUriResponse = await _mediaClient1.GetSnapshotUriAsync(profile.token);
-        var data = await DownloadImageAsync(snapShotUriResponse.Uri, _username, _password, _logger);
-        return data;
-      }
-      catch (Exception ex)
-      {
-        _logger?.Error($"ONVIF GetImage (media1) failed for {_url}: {ex}");
-        return null;
-      }
+      var snapShotUriResponse = await _mediaClient1.GetSnapshotUriAsync(profile.token);
+      return snapShotUriResponse.Uri;
     }
   }
 }

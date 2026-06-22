@@ -1,0 +1,16 @@
+{
+  "providerId": "Microsoft.Tools.ServiceModel.Svcutil",
+  "version": "8.0.0",
+  "options": {
+    "inputs": [
+      "../../wsdl/ver20/imaging/wsdl/imaging.wsdl"
+    ],
+    "messageContract": true,
+    "namespaceMappings": [
+      "*, ImagingServiceReference"
+    ],
+    "outputFile": "Reference.cs",
+    "targetFramework": "net8.0",
+    "typeReuseMode": "All"
+  }
+}

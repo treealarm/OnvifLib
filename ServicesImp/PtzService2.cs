@@ -137,6 +137,54 @@ namespace OnvifLib
       await _ptzClient.StopAsync(profileToken, panTilt, zoom);
     }
 
+    public async Task<List<PtzPresetDto>> GetPresetsAsync(string profileToken)
+    {
+      if (_ptzClient == null) return [];
+      try
+      {
+        var resp = await _ptzClient.GetPresetsAsync(profileToken);
+        return (resp.Preset ?? [])
+          .Select(p => new PtzPresetDto(p.token ?? string.Empty, p.Name ?? string.Empty))
+          .ToList();
+      }
+      catch (Exception ex)
+      {
+        _logger?.Error($"ONVIF GetPresets failed for {_url}: {ex.Message}");
+        return [];
+      }
+    }
+
+    public async Task<string> SetPresetAsync(string profileToken, string presetName, string presetToken)
+    {
+      if (_ptzClient == null)
+        throw new InvalidOperationException("PTZ client not initialized");
+      var resp = await _ptzClient.SetPresetAsync(new SetPresetRequest
+      {
+        ProfileToken = profileToken,
+        PresetName   = presetName,
+        PresetToken  = string.IsNullOrEmpty(presetToken) ? null : presetToken,
+      });
+      return resp.PresetToken ?? string.Empty;
+    }
+
+    public async Task GotoPresetAsync(string profileToken, string presetToken)
+    {
+      if (_ptzClient == null)
+        throw new InvalidOperationException("PTZ client not initialized");
+      await _ptzClient.GotoPresetAsync(profileToken, presetToken, new PTZSpeed
+      {
+        PanTilt = new Vector2D { x = 0.5f, y = 0.5f },
+        Zoom    = new Vector1D { x = 0.5f },
+      });
+    }
+
+    public async Task RemovePresetAsync(string profileToken, string presetToken)
+    {
+      if (_ptzClient == null)
+        throw new InvalidOperationException("PTZ client not initialized");
+      await _ptzClient.RemovePresetAsync(profileToken, presetToken);
+    }
+
     public override void Dispose()
     {
       try { _ptzClient?.Close(); } catch { }
@@ -145,4 +193,5 @@ namespace OnvifLib
   }
 
   public record PtzCapabilities(bool AbsoluteMove, bool RelativeMove, bool ContinuousMove);
+  public record PtzPresetDto(string Token, string Name);
 }
