@@ -107,6 +107,10 @@ namespace OnvifLib
       => Task.FromResult<List<OnvifAudioEncoderOption>>([]);
     public virtual Task SetAudioEncoderConfigAsync(OnvifAudioEncoderConfig config)
       => Task.CompletedTask;
+    protected static T FindConfigOrThrow<T>(IEnumerable<T> configs, string token, Func<T, string?> tokenSelector, string configTypeName)
+      => configs.FirstOrDefault(c => tokenSelector(c) == token)
+        ?? throw new InvalidOperationException($"{configTypeName} '{token}' not found on camera");
+
     public static string? GetExtensionFromMime(string? mime)
     {
       if (string.IsNullOrWhiteSpace(mime))
@@ -189,12 +193,12 @@ namespace OnvifLib
     }
     public async Task<ImageResult?> GetImage()
     {
-      var snapshotUri = await GetSnapshotUriAsync();
-      if (string.IsNullOrEmpty(snapshotUri))
-        return null;
-
       try
       {
+        var snapshotUri = await GetSnapshotUriAsync();
+        if (string.IsNullOrEmpty(snapshotUri))
+          return null;
+
         return await DownloadImageAsync(snapshotUri, _username, _password, _logger);
       }
       catch (Exception ex)

@@ -124,8 +124,7 @@ namespace OnvifLib
       // Fetch existing to preserve unmanaged fields
       var resp = await _mediaClient2.GetVideoEncoderConfigurationsAsync(
         new MediaServiceReference.GetVideoEncoderConfigurationsRequest());
-      var existing = (resp.Configurations ?? []).FirstOrDefault(c => c.token == config.Token)
-        ?? throw new InvalidOperationException($"VideoEncoderConfiguration '{config.Token}' not found on camera");
+      var existing = FindConfigOrThrow(resp.Configurations ?? [], config.Token, c => c.token, "VideoEncoderConfiguration");
 
       existing.Resolution = new MediaServiceReference.VideoResolution2 { Width = config.Width, Height = config.Height };
 
@@ -182,8 +181,7 @@ namespace OnvifLib
       if (_mediaClient2 == null) return;
       var resp = await _mediaClient2.GetAudioEncoderConfigurationsAsync(
         new MediaServiceReference.GetAudioEncoderConfigurationsRequest());
-      var existing = (resp.Configurations ?? []).FirstOrDefault(c => c.token == config.Token)
-        ?? throw new InvalidOperationException($"AudioEncoderConfiguration '{config.Token}' not found on camera");
+      var existing = FindConfigOrThrow(resp.Configurations ?? [], config.Token, c => c.token, "AudioEncoderConfiguration");
       existing.Encoding   = config.Encoding;
       existing.Bitrate    = config.Bitrate;
       existing.SampleRate = config.SampleRate;

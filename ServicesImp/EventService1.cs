@@ -95,11 +95,13 @@ namespace OnvifLib
 
       // The pull-point endpoint may require a different auth scheme than the device
       // service (e.g. Basic vs Digest). Cache key is the pull-point URI so a known-working
-      // scheme survives across re-subscribes that return the same address.
+      // scheme survives across re-subscribes that return the same address — but some cameras
+      // mint a fresh URI per subscription, so rebuild the provider whenever the key changes
+      // instead of pinning it to whatever URI the first subscription happened to return.
       var pullCacheKey = subscriptionUri.ToString();
-      if (_pullBindingProvider == null)
+      if (_pullBindingProvider == null || _pullBindingProvider.CacheKey != pullCacheKey)
       {
-        var pullInitialScheme = AuthSchemeCache.TryGet(pullCacheKey) ?? _deviceBindingProvider.Scheme;
+        var pullInitialScheme = AuthSchemeCache.TryGet(pullCacheKey) ?? _pullBindingProvider?.Scheme ?? _deviceBindingProvider.Scheme;
         _pullBindingProvider = new CustomBindingProvider(_bindingTimeoutSeconds, pullInitialScheme, pullCacheKey);
       }
 
@@ -213,26 +215,53 @@ namespace OnvifLib
       var needsResubscribe = false;
       while (!token.IsCancellationRequested)
       {
-        try
+        if (needsResubscribe || _pullClient == null || _pullClient.State == CommunicationState.Faulted)
         {
-          if (needsResubscribe || _pullClient == null || _pullClient.State == CommunicationState.Faulted)
+          try
           {
             await ResubscribeAsync();
-            needsResubscribe = false;
           }
-          else if (_pullClient.State != CommunicationState.Opened)
+          catch (Exception ex)
+          {
+            // Only the device-service binding is in play here (ResubscribeAsync talks to
+            // the device service via _deviceBindingProvider) — a challenge on this call
+            // must not be attributed to the unrelated pull-point binding.
+            if (_deviceBindingProvider.TrySwitchToChallenged(ex))
+            {
+              _authSchemeConfirmed = false;
+              _logger?.Warning($"Device-service auth scheme rejected for {_url}, switching and retrying: {ex.Message}");
+            }
+            else
+            {
+              _logger?.Error($"Re-subscribe failed for {_url}, will retry: {ex.Message}");
+            }
+
+            needsResubscribe = true;
+            await Task.Delay(2000);
+            continue;
+          }
+          needsResubscribe = false;
+        }
+
+        try
+        {
+          if (_pullClient!.State != CommunicationState.Opened)
           {
             await _pullClient.OpenAsync();
           }
 
+          // Snapshot once per iteration — PullTimeout is a public mutable property and is
+          // read again below after the SOAP call returns; a concurrent mutation between the
+          // two reads must not change the floor-delay calculation mid-iteration.
+          var pullTimeout = PullTimeout;
           var request = new PullMessagesRequest
           {
-            Timeout = XmlConvert.ToString(PullTimeout),
+            Timeout = XmlConvert.ToString(pullTimeout),
             MessageLimit = MessageLimit
           };
 
           var pullStarted = DateTime.UtcNow;
-          var response = await _pullClient!.PullMessagesAsync(request);
+          var response = await _pullClient.PullMessagesAsync(request);
 
           if (!_authSchemeConfirmed)
           {
@@ -269,8 +298,8 @@ namespace OnvifLib
           // how fast the camera actually responds — applied after dispatch, so it only
           // delays the next pull, never the event we just received.
           var elapsed = DateTime.UtcNow - pullStarted;
-          if (elapsed < PullTimeout)
-            await Task.Delay(PullTimeout - elapsed, token);
+          if (elapsed < pullTimeout)
+            await Task.Delay(pullTimeout - elapsed, token);
 
           if (DateTime.UtcNow + _terminationTime / 2 >= _subscriptionExpiry && _subscriptionManagerClient != null)
           {
@@ -283,18 +312,14 @@ namespace OnvifLib
         }
         catch (Exception ex)
         {
-          // Pull or renew failed — the pull point is likely terminated/invalid.
-          // If the camera challenged with a different auth scheme (e.g. Basic instead of
-          // Anonymous/Digest), switch to it now so the re-subscribe below uses it — and
-          // it gets remembered for next time via AuthSchemeCache.
-          var switchedScheme =
-            (_pullBindingProvider?.TrySwitchToChallenged(ex) ?? false) |
-            _deviceBindingProvider.TrySwitchToChallenged(ex);
-
-          if (switchedScheme)
+          // Pull or renew failed — the pull point is likely terminated/invalid. Only the
+          // pull-point binding is in play here (PullMessages/Renew both go through
+          // _pullBindingProvider), so only try switching that one — a challenge on this
+          // endpoint must not bleed into the device-service binding's scheme.
+          if (_pullBindingProvider?.TrySwitchToChallenged(ex) ?? false)
           {
             _authSchemeConfirmed = false;
-            _logger?.Warning($"Auth scheme rejected for {_url}, switching and re-subscribing: {ex.Message}");
+            _logger?.Warning($"Pull-point auth scheme rejected for {_url}, switching and re-subscribing: {ex.Message}");
           }
           else
           {

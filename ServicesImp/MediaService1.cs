@@ -151,8 +151,7 @@ namespace OnvifLib
 
       // Fetch existing to preserve unmanaged fields (multicast, session timeout, etc.)
       var resp = await _mediaClient1.GetVideoEncoderConfigurationsAsync();
-      var existing = (resp.Configurations ?? []).FirstOrDefault(c => c.token == config.Token)
-        ?? throw new InvalidOperationException($"VideoEncoderConfiguration '{config.Token}' not found on camera");
+      var existing = FindConfigOrThrow(resp.Configurations ?? [], config.Token, c => c.token, "VideoEncoderConfiguration");
 
       existing.Resolution = new MediaServiceReference1.VideoResolution { Width = config.Width, Height = config.Height };
 
@@ -203,8 +202,7 @@ namespace OnvifLib
     {
       if (_mediaClient1 == null) return;
       var resp = await _mediaClient1.GetAudioEncoderConfigurationsAsync();
-      var existing = (resp.Configurations ?? []).FirstOrDefault(c => c.token == config.Token)
-        ?? throw new InvalidOperationException($"AudioEncoderConfiguration '{config.Token}' not found on camera");
+      var existing = FindConfigOrThrow(resp.Configurations ?? [], config.Token, c => c.token, "AudioEncoderConfiguration");
       if (Enum.TryParse<MediaServiceReference1.AudioEncoding>(config.Encoding, ignoreCase: true, out var enc))
         existing.Encoding = enc;
       existing.Bitrate    = config.Bitrate;

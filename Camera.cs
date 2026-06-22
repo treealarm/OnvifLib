@@ -138,8 +138,12 @@ public class Camera
   public static string CreateUrl(string ip, int port, string? xaddr = null)
   {
     // Prefer the address actually discovered (WS-Discovery XAddr) over the standard
-    // template — some devices serve their device_service at a non-standard path.
-    return string.IsNullOrEmpty(xaddr) ? $"http://{ip}:{port}/onvif/device_service" : xaddr;
+    // template — some devices serve their device_service at a non-standard path. Fall back
+    // to the template if xaddr isn't a well-formed absolute URI (a non-compliant responder)
+    // so _url is always guaranteed parseable by EndpointAddress downstream.
+    if (!string.IsNullOrEmpty(xaddr) && Uri.TryCreate(xaddr, UriKind.Absolute, out _))
+      return xaddr;
+    return $"http://{ip}:{port}/onvif/device_service";
   }
 
   public static Camera Create(
@@ -213,7 +217,10 @@ public class Camera
 
     if (services != null)
     {
-      return await OnvifServiceSelector.TryCreateService<EventService1>(services, _bindingProvider.Current, _username, _password, MakeSecurityToken, _logger);
+      // Routed through _serviceCache (like the other Get*Service methods) so repeated calls
+      // within the cache TTL reuse the same instance instead of creating a fresh pull-point
+      // subscription — and a fresh AuthSchemeCache entry — on every call.
+      return await _serviceCache.GetServiceAsync<EventService1>(services);
     }
     return null;
   }

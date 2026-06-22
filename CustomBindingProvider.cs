@@ -32,6 +32,9 @@ namespace OnvifLib
 
     public CustomBinding Current => _binding;
 
+    /// <summary>The key this provider persists its scheme under in <see cref="AuthSchemeCache"/>, if any.</summary>
+    public string? CacheKey => _cacheKey;
+
     public AuthenticationSchemes Scheme =>
       _binding.Elements.OfType<HttpTransportBindingElement>().First().AuthenticationScheme;
 
