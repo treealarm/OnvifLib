@@ -8,7 +8,15 @@ namespace OnvifLib
   public record OnvifSimpleItem(string Name, string Value);
 
   /// <summary>
-  /// A configured analytics module or rule. <paramref name="ElementItemsXml"/> carries the
+  /// One structured parameter. The name is the camera's own label for the slot ("Field") and is
+  /// independent of the XML inside it ("Polygon") — rebuilding one from the other renames the
+  /// parameter, and a Modify carrying the wrong name is either rejected or silently applied to
+  /// something else.
+  /// </summary>
+  public record OnvifElementItem(string Name, string Xml);
+
+  /// <summary>
+  /// A configured analytics module or rule. <paramref name="ElementItems"/> carries the
   /// structured parameters (polygons, line segments, schedules) as raw XML: they have no fixed
   /// schema across vendors, and round-tripping them untouched is the only way a Modify call can
   /// avoid silently dropping whatever it did not understand.
@@ -17,7 +25,7 @@ namespace OnvifLib
     string Name,
     string Type,
     IReadOnlyList<OnvifSimpleItem> SimpleItems,
-    IReadOnlyList<string> ElementItemsXml);
+    IReadOnlyList<OnvifElementItem> ElementItems);
 
   /// <summary>One parameter a module/rule type accepts, as advertised by the camera.</summary>
   public record OnvifParameterDescription(string Name, string Type);
@@ -342,7 +350,7 @@ namespace OnvifLib
             .ToList(),
           (c.Parameters?.ElementItem ?? [])
             .Where(i => i?.Any != null)
-            .Select(i => i.Any.OuterXml)
+            .Select(i => new OnvifElementItem(i.Name ?? i.Any.LocalName, i.Any.OuterXml))
             .ToList()));
       }
       return result;
@@ -372,13 +380,13 @@ namespace OnvifLib
     private static Config ToConfig(OnvifAnalyticsModule module)
     {
       var elementItems = new List<ItemListElementItem>();
-      foreach (var xml in module.ElementItemsXml)
+      foreach (var item in module.ElementItems)
       {
-        if (string.IsNullOrWhiteSpace(xml)) continue;
+        if (string.IsNullOrWhiteSpace(item.Xml)) continue;
         var doc = new System.Xml.XmlDocument();
         try
         {
-          doc.LoadXml(xml);
+          doc.LoadXml(item.Xml);
         }
         catch (System.Xml.XmlException)
         {
@@ -389,7 +397,8 @@ namespace OnvifLib
         if (doc.DocumentElement == null) continue;
         elementItems.Add(new ItemListElementItem
         {
-          Name = doc.DocumentElement.LocalName,
+          // The camera's own name for the slot, echoed back unchanged.
+          Name = item.Name,
           Any = doc.DocumentElement,
         });
       }

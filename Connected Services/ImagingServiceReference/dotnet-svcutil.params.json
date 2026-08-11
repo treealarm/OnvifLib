@@ -10,7 +10,7 @@
       "*, ImagingServiceReference"
     ],
     "outputFile": "Reference.cs",
-    "targetFramework": "net8.0",
+    "targetFramework": "net10.0",
     "typeReuseMode": "All"
   }
 }

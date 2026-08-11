@@ -35,7 +35,7 @@
       "System.Xml.ReaderWriter, {System.Xml.ReaderWriter, 4.3.0}",
       "System.Xml.XmlDocument, {System.Xml.XmlDocument, 4.3.0}"
     ],
-    "targetFramework": "net8.0",
+    "targetFramework": "net10.0",
     "typeReuseMode": "All"
   }
 }

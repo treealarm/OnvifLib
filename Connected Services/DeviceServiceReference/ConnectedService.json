@@ -22,7 +22,7 @@
       "System.ServiceModel.Primitives, {System.ServiceModel.Primitives, 8.1.2}",
       "System.ServiceModel.Security, {System.ServiceModel.Primitives, 8.1.2}"
     ],
-    "targetFramework": "net8.0",
+    "targetFramework": "net10.0",
     "typeReuseMode": "All"
   }
 }
