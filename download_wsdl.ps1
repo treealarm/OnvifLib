@@ -48,3 +48,27 @@ foreach ($url in $wsdl_urls) {
 }
 
 Write-Host "All files downloaded successfully!"
+
+# ONVIF's tt:Polygon is a complex type whose entire content is one repeated <Point>. The
+# XmlSerializer schema importer collapses such a wrapper into a bare array, so the repeated
+# <Polygon> inside tt:ShapeDescriptor comes out as Vector[][] while the generated XmlArrayItem
+# attribute still declares the item type as Vector. WCF then fails to build the serializer for the
+# WHOLE analytics contract on the first call, with:
+#   CodeGenError(IsNotAssignableFrom): Cannot convert source type [Vector[]] to target type [Vector]
+#
+# ONVIF ship the workaround commented out in common.xsd ("uncomment for compilation with Visual
+# Studio"): giving the type an attribute stops the collapse, and Polygon becomes a real class. The
+# attribute is codegen-only — we never set it, so nothing changes on the wire. Re-applied here
+# because the download above overwrites the patched schema.
+$commonXsd = $wsdlsDir + "ver10/schema/common.xsd"
+$content = Get-Content -Path $commonXsd -Raw
+$commented = "<!--`t`t<xs:attribute name='dummy'/> uncomment for compilation with Visual Studio --> "
+if ($content.Contains($commented)) {
+    $content = $content.Replace($commented, "<xs:attribute name=""dummy""/>`n")
+    Set-Content -Path $commonXsd -Value $content -NoNewline
+    Write-Host "Patched common.xsd: enabled the tt:Polygon dummy attribute (see comment above)."
+} elseif ($content.Contains("<xs:attribute name=""dummy""/>")) {
+    Write-Host "common.xsd already carries the tt:Polygon dummy attribute."
+} else {
+    Write-Warning "common.xsd: could not find the tt:Polygon dummy attribute to enable - the analytics service reference will not deserialize. Patch it by hand before running dotnet-svcutil."
+}

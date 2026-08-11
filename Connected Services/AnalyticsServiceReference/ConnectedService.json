@@ -1,0 +1,13 @@
+{
+  "ExtendedData": {
+    "inputs": [
+      "../../wsdl/ver20/analytics/wsdl/analytics.wsdl"
+    ],
+    "messageContract": true,
+    "namespaceMappings": [
+      "*, AnalyticsServiceReference"
+    ],
+    "targetFramework": "net8.0",
+    "typeReuseMode": "All"
+  }
+}

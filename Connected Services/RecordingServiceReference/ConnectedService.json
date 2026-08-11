@@ -1,0 +1,12 @@
+{
+  "ExtendedData": {
+    "inputs": [
+      "../../wsdl/ver10/recording.wsdl"
+    ],
+    "namespaceMappings": [
+      "*, RecordingServiceReference"
+    ],
+    "targetFramework": "net8.0",
+    "typeReuseMode": "All"
+  }
+}

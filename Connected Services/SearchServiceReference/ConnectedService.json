@@ -1,0 +1,12 @@
+{
+  "ExtendedData": {
+    "inputs": [
+      "../../wsdl/ver10/search.wsdl"
+    ],
+    "namespaceMappings": [
+      "*, SearchServiceReference"
+    ],
+    "targetFramework": "net8.0",
+    "typeReuseMode": "All"
+  }
+}

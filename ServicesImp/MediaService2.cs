@@ -202,5 +202,137 @@ namespace OnvifLib
       var snapShotUriResponse = await _mediaClient2.GetSnapshotUriAsync(snapShotUriRequest);
       return snapShotUriResponse.Uri;
     }
+
+    public override async Task RefreshProfilesAsync()
+    {
+      if (_mediaClient2 == null) return;
+      var request = new MediaServiceReference.GetProfilesRequest { Type = ["All"] };
+      var profilesResponse = await _mediaClient2.GetProfilesAsync(request);
+      _profiles = profilesResponse.Profiles.ToList();
+    }
+
+    // ---- Metadata / analytics configurations -------------------------------------------------
+    // Unlike ver10, Media2 has no per-kind Add/Remove pair. Configurations are attached to and
+    // detached from a profile through the generic AddConfiguration/RemoveConfiguration, with the
+    // kind named in ConfigurationRef.Type.
+
+    private const string ConfigTypeMetadata = "Metadata";
+    private const string ConfigTypeAnalytics = "Analytics";
+
+    public override async Task<List<OnvifMetadataConfig>> GetMetadataConfigsAsync()
+    {
+      if (_mediaClient2 == null) return [];
+      // The attachment list below is read off the profiles, so they have to be current.
+      await RefreshProfilesAsync();
+      var resp = await _mediaClient2.GetMetadataConfigurationsAsync(new MediaServiceReference.GetMetadataConfigurationsRequest());
+      return (resp.Configurations ?? [])
+        .Where(c => c != null)
+        .Select(c => new OnvifMetadataConfig(
+          c.token ?? string.Empty,
+          c.Name ?? string.Empty,
+          c.AnalyticsSpecified && c.Analytics,
+          c.PTZStatus != null,
+          c.Events != null,
+          c.GeoLocationSpecified && c.GeoLocation,
+          c.ShapePolygonSpecified && c.ShapePolygon,
+          c.SessionTimeout,
+          c.CompressionType,
+          _profiles
+            .Where(p => p.Configurations?.Metadata?.token == c.token)
+            .Select(p => p.token)
+            .ToList()))
+        .ToList();
+    }
+
+    public override async Task<OnvifMetadataConfigOptions?> GetMetadataConfigOptionsAsync(string configToken)
+    {
+      if (_mediaClient2 == null) return null;
+      var resp = await _mediaClient2.GetMetadataConfigurationOptionsAsync(
+        new MediaServiceReference.GetMetadataConfigurationOptionsRequest { ConfigurationToken = configToken });
+      var opts = resp?.Options;
+      if (opts == null) return null;
+      return new OnvifMetadataConfigOptions(
+        opts.PTZStatusFilterOptions != null,
+        opts.Extension?.CompressionType ?? []);
+    }
+
+    public override async Task SetMetadataConfigAsync(OnvifMetadataConfigUpdate update)
+    {
+      if (_mediaClient2 == null) return;
+
+      // Read-modify-write for the same reason as the ver10 implementation: an omitted optional
+      // field can be read by the camera as "reset to default".
+      var resp = await _mediaClient2.GetMetadataConfigurationsAsync(new MediaServiceReference.GetMetadataConfigurationsRequest());
+      var existing = FindConfigOrThrow(
+        resp.Configurations ?? [], update.Token, c => c.token, "MetadataConfiguration");
+
+      if (update.Analytics.HasValue)
+      {
+        existing.Analytics = update.Analytics.Value;
+        existing.AnalyticsSpecified = true;
+      }
+      if (update.PtzStatus.HasValue)
+      {
+        existing.PTZStatus = update.PtzStatus.Value
+          ? existing.PTZStatus ?? new MediaServiceReference.PTZFilter { Status = true, Position = true }
+          : null;
+      }
+      if (update.SessionTimeout != null)
+        existing.SessionTimeout = update.SessionTimeout;
+      if (update.CompressionType != null)
+        existing.CompressionType = update.CompressionType;
+
+      await _mediaClient2.SetMetadataConfigurationAsync(
+        new MediaServiceReference.SetMetadataConfigurationRequest { Configuration = existing });
+    }
+
+    public override async Task<List<OnvifAnalyticsConfig>> GetAnalyticsConfigsAsync()
+    {
+      if (_mediaClient2 == null) return [];
+      await RefreshProfilesAsync();
+      var resp = await _mediaClient2.GetAnalyticsConfigurationsAsync(new MediaServiceReference.GetAnalyticsConfigurationsRequest());
+      return (resp.Configurations ?? [])
+        .Where(c => c != null)
+        .Select(c => new OnvifAnalyticsConfig(
+          c.token ?? string.Empty,
+          c.Name ?? string.Empty,
+          _profiles
+            .Where(p => p.Configurations?.Analytics?.token == c.token)
+            .Select(p => p.token)
+            .ToList()))
+        .ToList();
+    }
+
+    public override Task AttachMetadataConfigAsync(string profileToken, string configToken)
+      => AddConfigAsync(profileToken, ConfigTypeMetadata, configToken);
+
+    public override Task DetachMetadataConfigAsync(string profileToken, string configToken)
+      => RemoveConfigAsync(profileToken, ConfigTypeMetadata, configToken);
+
+    public override Task AttachAnalyticsConfigAsync(string profileToken, string configToken)
+      => AddConfigAsync(profileToken, ConfigTypeAnalytics, configToken);
+
+    public override Task DetachAnalyticsConfigAsync(string profileToken, string configToken)
+      => RemoveConfigAsync(profileToken, ConfigTypeAnalytics, configToken);
+
+    private async Task AddConfigAsync(string profileToken, string type, string configToken)
+    {
+      if (_mediaClient2 == null) return;
+      await _mediaClient2.AddConfigurationAsync(new AddConfigurationRequest
+      {
+        ProfileToken = profileToken,
+        Configuration = [new MediaServiceReference.ConfigurationRef { Type = type, Token = configToken }],
+      });
+    }
+
+    private async Task RemoveConfigAsync(string profileToken, string type, string configToken)
+    {
+      if (_mediaClient2 == null) return;
+      await _mediaClient2.RemoveConfigurationAsync(new RemoveConfigurationRequest
+      {
+        ProfileToken = profileToken,
+        Configuration = [new MediaServiceReference.ConfigurationRef { Type = type, Token = configToken }],
+      });
+    }
   }
 }

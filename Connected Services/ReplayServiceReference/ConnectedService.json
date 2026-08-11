@@ -1,0 +1,12 @@
+{
+  "ExtendedData": {
+    "inputs": [
+      "../../wsdl/ver10/replay.wsdl"
+    ],
+    "namespaceMappings": [
+      "*, ReplayServiceReference"
+    ],
+    "targetFramework": "net8.0",
+    "typeReuseMode": "All"
+  }
+}

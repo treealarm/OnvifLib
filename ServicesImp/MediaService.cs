@@ -57,7 +57,51 @@ namespace OnvifLib
     string SerialNumber,
     string HardwareId);
 
-  public record OnvifCapabilities(bool HasPtz, bool HasImaging, bool HasEvents);
+  public record OnvifCapabilities(bool HasPtz, bool HasImaging, bool HasEvents, bool HasDigitalInputs, bool HasEdgeRecording, bool HasAnalytics);
+
+  /// <summary>
+  /// A camera's MetadataConfiguration. <c>Analytics</c> is the flag that decides whether the
+  /// metadata track carries Scene Description (object boxes) at all; the rest is reported so the
+  /// admin UI can show what else the configuration is set to stream.
+  /// </summary>
+  public record OnvifMetadataConfig(
+    string Token,
+    string Name,
+    bool Analytics,
+    bool PtzStatus,
+    bool Events,
+    bool GeoLocation,
+    bool ShapePolygon,
+    string? SessionTimeout,
+    string? CompressionType,
+    // Profiles this configuration is attached to. A configuration with Analytics=true that is
+    // attached to nothing changes no stream: the metadata track only appears in an RTSP session
+    // pulled from a profile that carries the configuration.
+    IReadOnlyList<string> AttachedProfileTokens);
+
+  /// <summary>
+  /// What a camera says it will accept for a MetadataConfiguration. Note there is no "supports
+  /// analytics" option in the ONVIF schema — whether Scene Description is available is answered by
+  /// the presence of the analytics service, not by these options.
+  /// </summary>
+  public record OnvifMetadataConfigOptions(
+    bool SupportsPtzStatus,
+    IReadOnlyList<string> CompressionTypes);
+
+  /// <summary>
+  /// Requested changes to a MetadataConfiguration. Null means "leave as is": some cameras treat an
+  /// absent optional field in a Set request as "reset to default", so unchanged values are read
+  /// back and re-sent rather than omitted (same hazard as SetImagingSettingsAsync).
+  /// </summary>
+  public record OnvifMetadataConfigUpdate(
+    string Token,
+    bool? Analytics = null,
+    bool? PtzStatus = null,
+    string? SessionTimeout = null,
+    string? CompressionType = null);
+
+  /// <summary>A VideoAnalyticsConfiguration — the engine whose modules/rules produce the objects.</summary>
+  public record OnvifAnalyticsConfig(string Token, string Name, IReadOnlyList<string> AttachedProfileTokens);
 
   public class ImageResult
   {
@@ -107,6 +151,39 @@ namespace OnvifLib
       => Task.FromResult<List<OnvifAudioEncoderOption>>([]);
     public virtual Task SetAudioEncoderConfigAsync(OnvifAudioEncoderConfig config)
       => Task.CompletedTask;
+
+    // ---- Metadata / analytics configurations -------------------------------------------------
+    // Enabling the camera's own Scene Description takes two steps that both live here: a
+    // MetadataConfiguration with Analytics=true has to exist, and it has to be attached to the
+    // media profile the stream is pulled from — only then does the RTSP session carry a metadata
+    // track. The VideoAnalyticsConfiguration is what actually runs the detector behind it, and it
+    // has to be attached to the same profile.
+
+    /// <summary>
+    /// Re-reads the camera's profiles. The attachment lists reported below are derived from them,
+    /// and the profile snapshot is otherwise taken once at connect and kept for the lifetime of the
+    /// cached Camera — so without this, attaching a configuration would keep reading back as
+    /// "not attached" for as long as the connection stayed cached.
+    /// </summary>
+    public virtual Task RefreshProfilesAsync() => Task.CompletedTask;
+
+    public virtual Task<List<OnvifMetadataConfig>> GetMetadataConfigsAsync()
+      => Task.FromResult<List<OnvifMetadataConfig>>([]);
+    public virtual Task<OnvifMetadataConfigOptions?> GetMetadataConfigOptionsAsync(string configToken)
+      => Task.FromResult<OnvifMetadataConfigOptions?>(null);
+    public virtual Task SetMetadataConfigAsync(OnvifMetadataConfigUpdate update)
+      => Task.CompletedTask;
+    public virtual Task<List<OnvifAnalyticsConfig>> GetAnalyticsConfigsAsync()
+      => Task.FromResult<List<OnvifAnalyticsConfig>>([]);
+    public virtual Task AttachMetadataConfigAsync(string profileToken, string configToken)
+      => Task.CompletedTask;
+    public virtual Task DetachMetadataConfigAsync(string profileToken, string configToken)
+      => Task.CompletedTask;
+    public virtual Task AttachAnalyticsConfigAsync(string profileToken, string configToken)
+      => Task.CompletedTask;
+    public virtual Task DetachAnalyticsConfigAsync(string profileToken, string configToken)
+      => Task.CompletedTask;
+
     protected static T FindConfigOrThrow<T>(IEnumerable<T> configs, string token, Func<T, string?> tokenSelector, string configTypeName)
       => configs.FirstOrDefault(c => tokenSelector(c) == token)
         ?? throw new InvalidOperationException($"{configTypeName} '{token}' not found on camera");

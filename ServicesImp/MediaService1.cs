@@ -219,5 +219,125 @@ namespace OnvifLib
       var snapShotUriResponse = await _mediaClient1.GetSnapshotUriAsync(profile.token);
       return snapShotUriResponse.Uri;
     }
+
+    public override async Task RefreshProfilesAsync()
+    {
+      if (_mediaClient1 == null) return;
+      var profilesResponse = await _mediaClient1.GetProfilesAsync();
+      _profiles = profilesResponse.Profiles.ToList();
+    }
+
+    // ---- Metadata / analytics configurations -------------------------------------------------
+
+    public override async Task<List<OnvifMetadataConfig>> GetMetadataConfigsAsync()
+    {
+      if (_mediaClient1 == null) return [];
+      // The attachment list below is read off the profiles, so they have to be current.
+      await RefreshProfilesAsync();
+      var resp = await _mediaClient1.GetMetadataConfigurationsAsync();
+      return (resp.Configurations ?? [])
+        .Where(c => c != null)
+        .Select(c => new OnvifMetadataConfig(
+          c.token ?? string.Empty,
+          c.Name ?? string.Empty,
+          c.AnalyticsSpecified && c.Analytics,
+          c.PTZStatus != null,
+          c.Events != null,
+          c.GeoLocationSpecified && c.GeoLocation,
+          c.ShapePolygonSpecified && c.ShapePolygon,
+          c.SessionTimeout,
+          c.CompressionType,
+          _profiles
+            .Where(p => p.MetadataConfiguration?.token == c.token)
+            .Select(p => p.token)
+            .ToList()))
+        .ToList();
+    }
+
+    public override async Task<OnvifMetadataConfigOptions?> GetMetadataConfigOptionsAsync(string configToken)
+    {
+      if (_mediaClient1 == null) return null;
+      // ProfileToken is optional in the schema; asking without one gets the options that hold for
+      // the configuration on its own, which is what the admin UI shows.
+      var opts = await _mediaClient1.GetMetadataConfigurationOptionsAsync(configToken, string.Empty);
+      if (opts == null) return null;
+      return new OnvifMetadataConfigOptions(
+        opts.PTZStatusFilterOptions != null,
+        opts.Extension?.CompressionType ?? []);
+    }
+
+    public override async Task SetMetadataConfigAsync(OnvifMetadataConfigUpdate update)
+    {
+      if (_mediaClient1 == null) return;
+
+      // Read-modify-write, like SetVideoEncoderConfigAsync: several cameras read an absent optional
+      // field in a Set request as "reset to default" rather than "leave unchanged", so everything
+      // the caller did not ask to change is echoed back verbatim.
+      var resp = await _mediaClient1.GetMetadataConfigurationsAsync();
+      var existing = FindConfigOrThrow(
+        resp.Configurations ?? [], update.Token, c => c.token, "MetadataConfiguration");
+
+      if (update.Analytics.HasValue)
+      {
+        existing.Analytics = update.Analytics.Value;
+        existing.AnalyticsSpecified = true;
+      }
+      if (update.PtzStatus.HasValue)
+      {
+        // The PTZ filter is a whole element, not a flag: absent means "do not stream PTZ status".
+        existing.PTZStatus = update.PtzStatus.Value
+          ? existing.PTZStatus ?? new MediaServiceReference1.PTZFilter { Status = true, Position = true }
+          : null;
+      }
+      if (update.SessionTimeout != null)
+        existing.SessionTimeout = update.SessionTimeout;
+      if (update.CompressionType != null)
+        existing.CompressionType = update.CompressionType;
+
+      await _mediaClient1.SetMetadataConfigurationAsync(existing, true);
+    }
+
+    public override async Task<List<OnvifAnalyticsConfig>> GetAnalyticsConfigsAsync()
+    {
+      if (_mediaClient1 == null) return [];
+      await RefreshProfilesAsync();
+      var resp = await _mediaClient1.GetVideoAnalyticsConfigurationsAsync();
+      return (resp.Configurations ?? [])
+        .Where(c => c != null)
+        .Select(c => new OnvifAnalyticsConfig(
+          c.token ?? string.Empty,
+          c.Name ?? string.Empty,
+          _profiles
+            .Where(p => p.VideoAnalyticsConfiguration?.token == c.token)
+            .Select(p => p.token)
+            .ToList()))
+        .ToList();
+    }
+
+    public override async Task AttachMetadataConfigAsync(string profileToken, string configToken)
+    {
+      if (_mediaClient1 == null) return;
+      await _mediaClient1.AddMetadataConfigurationAsync(profileToken, configToken);
+    }
+
+    // ver10 removes by profile, not by configuration: a profile holds at most one metadata
+    // configuration, so the token is not part of the request.
+    public override async Task DetachMetadataConfigAsync(string profileToken, string configToken)
+    {
+      if (_mediaClient1 == null) return;
+      await _mediaClient1.RemoveMetadataConfigurationAsync(profileToken);
+    }
+
+    public override async Task AttachAnalyticsConfigAsync(string profileToken, string configToken)
+    {
+      if (_mediaClient1 == null) return;
+      await _mediaClient1.AddVideoAnalyticsConfigurationAsync(profileToken, configToken);
+    }
+
+    public override async Task DetachAnalyticsConfigAsync(string profileToken, string configToken)
+    {
+      if (_mediaClient1 == null) return;
+      await _mediaClient1.RemoveVideoAnalyticsConfigurationAsync(profileToken);
+    }
   }
 }
