@@ -1,0 +1,37 @@
+{
+  "profiles": {
+    "discovery only": {
+      "commandName": "Project",
+      "commandLineArgs": "--discovery --only discovery"
+    },
+    "read-only": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "ONVIF_IP": "192.168.1.10",
+        "ONVIF_PORT": "80",
+        "ONVIF_USER": "admin",
+        "ONVIF_PASSWORD": ""
+      }
+    },
+    "read-only (verbose)": {
+      "commandName": "Project",
+      "commandLineArgs": "--verbose",
+      "environmentVariables": {
+        "ONVIF_IP": "192.168.1.10",
+        "ONVIF_PORT": "80",
+        "ONVIF_USER": "admin",
+        "ONVIF_PASSWORD": ""
+      }
+    },
+    "reversible writes": {
+      "commandName": "Project",
+      "commandLineArgs": "--allow-writes",
+      "environmentVariables": {
+        "ONVIF_IP": "192.168.1.10",
+        "ONVIF_PORT": "80",
+        "ONVIF_USER": "admin",
+        "ONVIF_PASSWORD": ""
+      }
+    }
+  }
+}

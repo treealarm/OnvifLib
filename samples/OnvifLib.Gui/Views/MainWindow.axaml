@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:OnvifLib.Gui.ViewModels"
+        xmlns:views="using:OnvifLib.Gui.Views"
+        x:Class="OnvifLib.Gui.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/icon.png"
+        Title="OnvifLib test bench"
+        Width="1280" Height="840"
+        MinWidth="900" MinHeight="600">
+
+  <DockPanel>
+
+    <!-- Connection bar -->
+    <Border DockPanel.Dock="Top" Padding="8" BorderThickness="0,0,0,1" BorderBrush="#33808080">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Address" VerticalAlignment="Center" />
+        <TextBox Text="{Binding Ip}" Width="150" Watermark="192.168.1.10" />
+        <TextBlock Text="Port" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1"
+                       FormatString="0" Width="110" />
+
+        <TextBlock Text="User" VerticalAlignment="Center" Margin="8,0,0,0" />
+        <TextBox Text="{Binding User}" Width="110" />
+
+        <TextBlock Text="Password" VerticalAlignment="Center" />
+        <!-- Two boxes over one property rather than a converter on PasswordChar: the reveal
+             toggle is the whole feature and this keeps it obvious. -->
+        <TextBox Text="{Binding Password}" PasswordChar="•" Width="130"
+                 IsVisible="{Binding !RevealPassword}" />
+        <TextBox Text="{Binding Password}" Width="130" IsVisible="{Binding RevealPassword}" />
+        <ToggleButton IsChecked="{Binding RevealPassword}" Content="👁" ToolTip.Tip="Show the password" />
+        <CheckBox IsChecked="{Binding RememberPassword}" Content="Remember"
+                  VerticalAlignment="Center"
+                  ToolTip.Tip="Stores the password in clear text in the settings file next to the address and user name. Off by default." />
+
+        <TextBlock Text="Timeout" VerticalAlignment="Center" Margin="8,0,0,0" />
+        <NumericUpDown Value="{Binding TimeoutSeconds}" Minimum="1" Maximum="120" Increment="1"
+                       FormatString="0" Width="100"
+                       ToolTip.Tip="Seconds, baked into the binding by Camera.Create. Most library calls take no cancellation token, so this is what bounds them." />
+
+        <CheckBox IsChecked="{Binding CaptureSoap}" Content="Capture SOAP"
+                  VerticalAlignment="Center"
+                  ToolTip.Tip="Passing a logger to Camera.Create is what turns on the SOAP dump, and it cannot be changed afterwards — this takes effect on the next connect." />
+
+        <Button Content="Connect" Command="{Binding ConnectCommand}" />
+        <Button Content="Disconnect" Command="{Binding DisconnectCommand}"
+                IsEnabled="{Binding IsConnected}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Padding="8,4" BorderThickness="0,1,0,0" BorderBrush="#33808080">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Runner.Status}" TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center"
+                   Classes.error="{Binding Runner.StatusIsError}" />
+        <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="120" Height="4" Margin="12,0"
+                     IsVisible="{Binding Runner.IsBusy}" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="{Binding ConnectionText}" Opacity="0.7"
+                   VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    <!-- Tabs. Deliberately never disabled: a tab the camera cannot support still opens and
+         explains why, because "this camera has no PTZ" is exactly what a test bench is for. -->
+    <TabControl>
+      <TabItem Header="Discovery">
+        <views:DiscoveryView DataContext="{Binding Discovery}" />
+      </TabItem>
+      <TabItem Header="Device">
+        <views:DeviceView DataContext="{Binding Device}" />
+      </TabItem>
+      <TabItem Header="Media">
+        <views:MediaView DataContext="{Binding Media}" />
+      </TabItem>
+      <TabItem Header="PTZ">
+        <views:PtzView DataContext="{Binding Ptz}" />
+      </TabItem>
+      <TabItem Header="Imaging">
+        <views:ImagingView DataContext="{Binding Imaging}" />
+      </TabItem>
+      <TabItem Header="Events">
+        <views:EventsView DataContext="{Binding Events}" />
+      </TabItem>
+      <TabItem Header="Analytics">
+        <views:AnalyticsView DataContext="{Binding Analytics}" />
+      </TabItem>
+      <TabItem Header="Profile G">
+        <views:RecordingView DataContext="{Binding Recording}" />
+      </TabItem>
+      <TabItem Header="Device I/O">
+        <views:DeviceIoView DataContext="{Binding DeviceIo}" />
+      </TabItem>
+      <TabItem Header="Log">
+        <views:LogView DataContext="{Binding Log}" />
+      </TabItem>
+    </TabControl>
+
+  </DockPanel>
+</Window>

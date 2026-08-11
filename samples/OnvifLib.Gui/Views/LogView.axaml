@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.LogView"
+             x:DataType="vm:LogViewModel">
+
+  <DockPanel Margin="8">
+
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <TextBlock Text="Minimum level" VerticalAlignment="Center" />
+      <ComboBox ItemsSource="{Binding Levels}" SelectedItem="{Binding MinimumLevel}" Width="120"
+                ToolTip.Tip="Applied where entries are produced, so leaving this above Debug genuinely stops paying for the SOAP dumps." />
+      <TextBox Text="{Binding Filter}" Watermark="filter…" Width="260" />
+      <ToggleButton IsChecked="{Binding IsPaused}" Content="Pause" />
+      <Button Content="Clear" Command="{Binding ClearCommand}" />
+      <Button Content="Copy all" Click="OnCopyAll" />
+      <Button Content="Save…" Click="OnSave" />
+      <CheckBox x:Name="AutoScroll" Content="Auto-scroll" IsChecked="True" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding Entries.Count, StringFormat='{}{0} shown'}" Opacity="0.7"
+                 VerticalAlignment="Center" />
+    </StackPanel>
+
+    <!-- SOAP dumps run to thousands of characters, so the grid shows one line and this pane
+         shows the selected entry in full. -->
+    <TextBox DockPanel.Dock="Bottom" Height="160" Classes="mono" IsReadOnly="True"
+             AcceptsReturn="True" TextWrapping="Wrap" Margin="0,8,0,0"
+             Text="{Binding SelectedMessage, Mode=OneWay}" />
+
+    <DataGrid x:Name="Grid" ItemsSource="{Binding Entries}" SelectedItem="{Binding Selected}"
+              IsReadOnly="True" GridLinesVisibility="Horizontal" CanUserResizeColumns="True">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Time" Binding="{Binding TimeText}" Width="110" />
+        <DataGridTextColumn Header="Level" Binding="{Binding LevelText}" Width="80" />
+        <DataGridTextColumn Header="Message" Binding="{Binding FirstLine}" Width="*" />
+      </DataGrid.Columns>
+    </DataGrid>
+
+  </DockPanel>
+</UserControl>

@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Suppresses the console window on Windows. On Linux the PE subsystem flag is ignored, so
+         this is the right setting for a cross-platform desktop app. -->
+    <OutputType>WinExe</OutputType>
+    <!-- Matches the library, which moved to net10.0 in 1.1.0. A project cannot reference a
+         library on a newer target framework, so this must track OnvifLib.csproj. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OnvifLib.Gui</RootNamespace>
+    <AssemblyName>OnvifLib.Gui</AssemblyName>
+
+    <!-- Sample: must never produce or publish a NuGet package. The library sets
+         GeneratePackageOnBuild=true and CI pushes "**/*.nupkg", so leaving these at their
+         defaults would risk uploading the sample to nuget.org. -->
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- System.ServiceModel.* builds channels, serializers and the generated *ClientChannel
+         proxies by reflection, with no trim annotations. A trimmed or AOT build launches and
+         then fails on the first SOAP call. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
+
+    <!-- Compiled bindings turn a renamed view-model property into a compile error instead of a
+         silently blank field, which is worth a lot across ten tabs. -->
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- One number for every Avalonia package: mismatched versions across them produce obscure
+         XAML-compiler failures rather than a useful error. 11.3.13 rather than the newest 11.3.x
+         because Avalonia.Controls.DataGrid stops there in that line, and a higher core version
+         drags the DataGrid up to 12.x and fails the restore as a package downgrade. -->
+    <AvaloniaVersion>11.3.13</AvaloniaVersion>
+
+    <!-- Camera lives in the global namespace; CS8981 is the warning the library already
+         suppresses for the same reason. -->
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <!-- Metapackage: Win32 + X11 + Native backends, so one reference covers Windows and Linux. -->
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
+    <!-- Not part of the metapackage, and its theme must be included in App.axaml or every
+         DataGrid renders empty. -->
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="$(AvaloniaVersion)" />
+    <!-- F12 inspector; Debug only so the Release output stays lean. -->
+    <PackageReference Include="Avalonia.Diagnostics" Version="$(AvaloniaVersion)" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+
+    <!-- Avalonia.X11 asks for 0.21.2, which NuGet audit flags as a high-severity advisory
+         (GHSA-xrw6-gwf8-vvr9: a malicious D-Bus peer can spoof signals and exhaust file
+         descriptors). 0.21.3 is the patch for that line — a direct reference is the only way to
+         lift a transitive dependency. Drop this line once Avalonia asks for it itself.
+         Same technique the library uses for System.Security.Cryptography.Xml. -->
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\OnvifLib.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reuses the library's icon rather than adding a second copy of it to the repository. -->
+    <AvaloniaResource Include="..\..\icon.png" Link="Assets\icon.png" />
+  </ItemGroup>
+
+</Project>

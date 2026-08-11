@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.DiscoveryView"
+             x:DataType="vm:DiscoveryViewModel">
+
+  <Grid Margin="8" ColumnDefinitions="*,12,*">
+
+    <!-- WS-Discovery: asks devices to announce themselves, so it finds the real ONVIF port
+         even when it is not the default. -->
+    <DockPanel Grid.Column="0">
+      <TextBlock DockPanel.Dock="Top" Classes="section" Text="WS-Discovery (multicast)" />
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+        <TextBlock Text="Timeout" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding ProbeSeconds}" Minimum="1" Maximum="30" Increment="1"
+                       FormatString="0" Width="100" />
+        <Button Content="Probe" Command="{Binding ProbeCommand}" />
+        <Button Content="Cancel" Command="{Binding CancelProbeCommand}" />
+        <Button Content="Use selected" Command="{Binding UseSelectedDeviceCommand}" />
+      </StackPanel>
+      <Border DockPanel.Dock="Top" Classes="banner">
+        <TextBlock Classes="hint" Text="{Binding ProbeResultText}"
+                   Classes.error="{Binding ProbeResultIsWarning}" />
+      </Border>
+
+      <DataGrid ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}"
+                IsReadOnly="True" GridLinesVisibility="Horizontal" CanUserResizeColumns="True"
+                DoubleTapped="OnDeviceDoubleTapped">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="Auto" />
+          <DataGridTextColumn Header="Hardware" Binding="{Binding Hardware}" Width="Auto" />
+          <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="Auto" />
+          <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="Auto" />
+          <DataGridTextColumn Header="XAddrs" Binding="{Binding XAddrs[0]}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </DockPanel>
+
+    <!-- Brute-force sweep: slower, but works where multicast does not reach. -->
+    <DockPanel Grid.Column="2">
+      <TextBlock DockPanel.Dock="Top" Classes="section" Text="IP range scan" />
+      <TextBlock DockPanel.Dock="Top" Classes="hint"
+                 Text="Tries every address × port with the user and password from the connection bar. Slower than discovery, but it works across subnets where multicast does not reach." />
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,4,0,4">
+        <TextBox Text="{Binding ScanFrom}" Width="130" Watermark="from" />
+        <TextBox Text="{Binding ScanTo}" Width="130" Watermark="to" />
+        <TextBox Text="{Binding ScanPorts}" Width="150" Watermark="ports" />
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+        <Button Content="Scan" Command="{Binding ScanCommand}" IsEnabled="{Binding !IsScanning}" />
+        <Button Content="Cancel" Command="{Binding CancelScanCommand}" IsEnabled="{Binding IsScanning}" />
+        <Button Content="Use selected" Command="{Binding UseSelectedScannedCommand}" />
+        <ProgressBar Value="{Binding ScanPercent}" Maximum="100" Width="150" Height="6"
+                     VerticalAlignment="Center" />
+        <TextBlock Text="{Binding ScanStatus}" VerticalAlignment="Center" Opacity="0.7" />
+      </StackPanel>
+
+      <DataGrid ItemsSource="{Binding Scanned}" SelectedItem="{Binding SelectedScanned}"
+                IsReadOnly="True" GridLinesVisibility="Horizontal"
+                DoubleTapped="OnScannedDoubleTapped">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="IP" Binding="{Binding Ip}" Width="Auto" />
+          <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="Auto" />
+          <DataGridTextColumn Header="User" Binding="{Binding User}" Width="Auto" />
+          <DataGridTextColumn Header="URL" Binding="{Binding Url}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+    </DockPanel>
+
+  </Grid>
+</UserControl>

@@ -31,12 +31,14 @@
             "problemMatcher": "$msCompile"
         },
         {
+            // Packs the library only. The samples set IsPackable=false, but naming the project
+            // keeps the release artifact independent of that.
             "label": "pack",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "pack",
-                "${workspaceFolder}/OnvifLib.sln",
+                "${workspaceFolder}/OnvifLib.csproj",
                 "-c",
                 "Release",
                 "/property:GenerateFullPaths=true",
@@ -51,6 +53,22 @@
             "args": [
                 "clean",
                 "${workspaceFolder}/OnvifLib.sln"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            // Loads every GUI view and fails if any of them does not construct. A TabControl only
+            // realises the selected tab, so this is what catches a XAML error in a tab nobody
+            // clicked. Cheap enough to run after touching any .axaml.
+            "label": "gui self-test",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/samples/OnvifLib.Gui/OnvifLib.Gui.csproj",
+                "--",
+                "--selftest"
             ],
             "problemMatcher": "$msCompile"
         }

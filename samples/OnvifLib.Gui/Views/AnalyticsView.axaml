@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             xmlns:onvif="using:OnvifLib"
+             x:Class="OnvifLib.Gui.Views.AnalyticsView"
+             x:DataType="vm:AnalyticsViewModel">
+
+  <Panel Margin="8">
+
+    <Border Classes="banner" VerticalAlignment="Top" IsVisible="{Binding !IsAvailable}">
+      <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
+    </Border>
+
+    <DockPanel IsVisible="{Binding IsAvailable}">
+
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+        <TextBlock Text="Configuration" VerticalAlignment="Center" />
+        <ComboBox ItemsSource="{Binding Configurations}" SelectedItem="{Binding SelectedConfiguration}"
+                  Width="240" PlaceholderText="load configurations…">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="onvif:OnvifAnalyticsConfig">
+              <TextBlock Text="{Binding Name}" ToolTip.Tip="{Binding Token}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <Button Content="Load configurations" Command="{Binding LoadConfigurationsCommand}" />
+        <Button Content="Load modules" Command="{Binding LoadModulesCommand}" />
+        <Button Content="Load rules" Command="{Binding LoadRulesCommand}" />
+      </StackPanel>
+      <TextBlock DockPanel.Dock="Top" Classes="hint" Margin="0,0,0,8"
+                 Text="Everything here is keyed by a VideoAnalyticsConfiguration token, which only the media service hands out — the Media tab loads the same list." />
+
+      <Grid ColumnDefinitions="*,8,*,8,1.1*">
+
+        <!-- Modules -->
+        <DockPanel Grid.Column="0">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Modules the camera supports" />
+          <DataGrid DockPanel.Dock="Top" ItemsSource="{Binding SupportedModules}"
+                    SelectedItem="{Binding SelectedSupportedModule}" IsReadOnly="True" Height="120"
+                    GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*" />
+              <DataGridTextColumn Header="Max" Binding="{Binding MaxInstances}" Width="Auto" />
+              <DataGridTextColumn Header="Params" Binding="{Binding Parameters.Count}" Width="Auto" />
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Modules it is running" />
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+            <Button Content="Apply edits" Command="{Binding ApplyModuleCommand}" />
+            <Button Content="Delete" Command="{Binding DeleteModuleCommand}" />
+          </StackPanel>
+          <DataGrid ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModule}"
+                    IsReadOnly="True" GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="Auto" />
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+
+        <!-- Rules -->
+        <DockPanel Grid.Column="2">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Rules the camera supports" />
+          <DataGrid DockPanel.Dock="Top" ItemsSource="{Binding SupportedRules}"
+                    SelectedItem="{Binding SelectedSupportedRule}" IsReadOnly="True" Height="120"
+                    GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*" />
+              <DataGridTextColumn Header="Max" Binding="{Binding MaxInstances}" Width="Auto" />
+              <DataGridTextColumn Header="Cells" Binding="{Binding CellLayout}" Width="Auto" />
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Rules it is running" />
+          <TextBlock DockPanel.Dock="Bottom" Classes="hint" Margin="0,4,0,0"
+                     Text="A cell layout is the only way to make sense of an ActiveCells bitmask: the mask is a flat run of bits, and only the column and row counts say which cell is where. Many firmwares omit it." />
+          <DataGrid ItemsSource="{Binding Rules}" IsReadOnly="True" GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="Auto" />
+              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+
+        <!-- Parameters and raw XML -->
+        <DockPanel Grid.Column="4">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Simple parameters (editable)" />
+          <DataGrid DockPanel.Dock="Top" ItemsSource="{Binding SelectedItems}" Height="130"
+                    GridLinesVisibility="Horizontal" CanUserSortColumns="False">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="Auto" IsReadOnly="True" />
+              <DataGridTextColumn Header="Value" Binding="{Binding Value}" Width="*" />
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Structured parameters (read-only)" />
+          <TextBlock DockPanel.Dock="Top" Classes="hint"
+                     Text="Polygons, line segments and schedules. No fixed schema across vendors, so they are round-tripped verbatim on Modify — rebuilding them from parsed state is how vendor rules get silently corrupted." />
+          <TextBox DockPanel.Dock="Top" Height="130" Classes="mono" IsReadOnly="True"
+                   AcceptsReturn="True" Text="{Binding StructuredXml, Mode=OneWay}" Margin="0,4,0,4" />
+
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
+            <Button Content="Module options XML" Command="{Binding LoadModuleOptionsXmlCommand}" />
+            <Button Content="Rule options XML" Command="{Binding LoadRuleOptionsXmlCommand}" />
+            <Button Content="Supported rules XML" Command="{Binding LoadSupportedRulesXmlCommand}" />
+          </StackPanel>
+          <TextBox Classes="mono" IsReadOnly="True" AcceptsReturn="True"
+                   Text="{Binding RawXml, Mode=OneWay}" />
+        </DockPanel>
+
+      </Grid>
+    </DockPanel>
+  </Panel>
+</UserControl>

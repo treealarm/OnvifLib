@@ -1,0 +1,126 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.RecordingView"
+             x:DataType="vm:RecordingViewModel">
+
+  <Panel Margin="8">
+
+    <Border Classes="banner" VerticalAlignment="Top" IsVisible="{Binding !IsAvailable}">
+      <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
+    </Border>
+
+    <DockPanel IsVisible="{Binding IsAvailable}">
+
+      <Border DockPanel.Dock="Top" Classes="banner">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding ClockText}" TextWrapping="Wrap" />
+          <TextBlock Classes="hint"
+                     Text="The camera indexes its own archive in its own clock. Search windows below are converted into it before they are sent, and the results are shown as the camera reported them." />
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="*,8,1.3*">
+
+        <!-- Recording service -->
+        <DockPanel Grid.Column="0">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Recordings on the camera" />
+          <Button DockPanel.Dock="Top" Content="Load recordings and jobs"
+                  Command="{Binding LoadRecordingsCommand}" HorizontalAlignment="Left" Margin="0,0,0,4" />
+          <TextBlock DockPanel.Dock="Top" Classes="hint" Text="{Binding CapabilitiesText}" />
+
+          <TextBlock DockPanel.Dock="Bottom" Classes="hint" Margin="0,4,0,0"
+                     Text="Setting a job to Idle stops the camera recording. Deleting a recording erases footage from the device. Both ask first; the console probe refuses to do either." />
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+            <Button Content="Job → Active" Command="{Binding SetJobActiveCommand}" />
+            <Button Content="Job → Idle" Command="{Binding SetJobIdleCommand}" />
+            <Button Content="Delete recording" Command="{Binding DeleteRecordingCommand}" />
+          </StackPanel>
+          <DataGrid DockPanel.Dock="Bottom" ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}"
+                    IsReadOnly="True" Height="110" GridLinesVisibility="Horizontal" Margin="0,4,0,0">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Job" Binding="{Binding JobToken}" Width="Auto" />
+              <DataGridTextColumn Header="Recording" Binding="{Binding RecordingToken}" Width="*" />
+              <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto" />
+            </DataGrid.Columns>
+          </DataGrid>
+
+          <DataGrid ItemsSource="{Binding Recordings}" SelectedItem="{Binding SelectedRecording}"
+                    IsReadOnly="True" GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Token" Binding="{Binding RecordingToken}" Width="Auto" />
+              <DataGridTextColumn Header="Source" Binding="{Binding SourceName}" Width="*" />
+              <DataGridTextColumn Header="Retention" Binding="{Binding MaximumRetentionTime}" Width="Auto" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </DockPanel>
+
+        <!-- Search and replay -->
+        <DockPanel Grid.Column="2">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Search" />
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+            <Button Content="Summary" Command="{Binding LoadSummaryCommand}"
+                    ToolTip.Tip="Also fills the window below with the range the camera says it holds." />
+            <DatePicker SelectedDate="{Binding FromDate}" />
+            <DatePicker SelectedDate="{Binding ToDate}" />
+            <NumericUpDown Value="{Binding MaxResults}" Minimum="1" Maximum="1000" Increment="10"
+                           FormatString="0" Width="110" />
+            <Button Content="Find" Command="{Binding SearchCommand}" IsEnabled="{Binding !IsSearching}" />
+            <Button Content="Cancel" Command="{Binding CancelSearchCommand}" IsEnabled="{Binding IsSearching}" />
+          </StackPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="hint" Text="{Binding SummaryText}" />
+          <TextBlock DockPanel.Dock="Top" Classes="hint"
+                     Text="FindRecordings polls the device until it finishes, so a full card can take tens of seconds. It is one of the few library calls that honours cancellation." />
+
+          <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+            <TextBlock Classes="section" Text="Replay" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Capabilities" Command="{Binding LoadReplayCapabilitiesCommand}" />
+              <ComboBox ItemsSource="{Binding Transports}" SelectedItem="{Binding Transport}" Width="100" />
+              <Button Content="Play selected recording" Command="{Binding PlayReplayCommand}" />
+              <TextBlock Text="{Binding SelectedFoundToken}" VerticalAlignment="Center" Opacity="0.7" />
+            </StackPanel>
+            <TextBlock Classes="hint" Text="{Binding ReplayCapabilitiesText}" />
+            <SelectableTextBlock Text="{Binding ReplayUri}" Classes="mono" TextWrapping="Wrap" />
+            <TextBlock Classes="hint"
+                       Text="A fresh URI is requested every time. Replay URIs are frequently single-use, so this app deliberately has no way to replay a cached one." />
+          </StackPanel>
+
+          <Grid RowDefinitions="*,4,*,4,*">
+            <DataGrid Grid.Row="0" ItemsSource="{Binding Found}" SelectedItem="{Binding SelectedFound}"
+                      IsReadOnly="True" GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Recording" Binding="{Binding RecordingToken}" Width="Auto" />
+                <DataGridTextColumn Header="Source" Binding="{Binding SourceName}" Width="*" />
+                <DataGridTextColumn Header="Earliest (camera)" Binding="{Binding EarliestRecording}" Width="Auto" />
+                <DataGridTextColumn Header="Latest (camera)" Binding="{Binding LatestRecording}" Width="Auto" />
+                <DataGridTextColumn Header="Status" Binding="{Binding RecordingStatus}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <DataGrid Grid.Row="2" ItemsSource="{Binding Tracks}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Track" Binding="{Binding TrackToken}" Width="Auto" />
+                <DataGridTextColumn Header="Type" Binding="{Binding TrackType}" Width="Auto" />
+                <DataGridTextColumn Header="From (camera)" Binding="{Binding DataFrom}" Width="*" />
+                <DataGridTextColumn Header="To (camera)" Binding="{Binding DataTo}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+
+            <DataGrid Grid.Row="4" ItemsSource="{Binding Intervals}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Recording" Binding="{Binding RecordingToken}" Width="Auto" />
+                <DataGridTextColumn Header="Track" Binding="{Binding TrackToken}" Width="Auto" />
+                <DataGridTextColumn Header="From" Binding="{Binding From}" Width="*" />
+                <DataGridTextColumn Header="Until" Binding="{Binding Until}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </Grid>
+        </DockPanel>
+
+      </Grid>
+    </DockPanel>
+  </Panel>
+</UserControl>

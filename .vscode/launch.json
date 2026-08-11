@@ -1,0 +1,117 @@
+{
+  // F5 configurations for the sample applications. Pick one from the dropdown in the Run panel.
+  // Each one builds the solution first via the "build" task in tasks.json.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GUI",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/samples/OnvifLib.Gui/bin/Debug/net10.0/OnvifLib.Gui.dll",
+      "cwd": "${workspaceFolder}/samples/OnvifLib.Gui",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      // Builds every view and exits non-zero if any fails to load. A TabControl only realises the
+      // selected tab, so this is what catches a XAML error in a tab nobody clicked.
+      "name": "GUI: self-test",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/samples/OnvifLib.Gui/bin/Debug/net10.0/OnvifLib.Gui.dll",
+      "args": ["--selftest"],
+      "cwd": "${workspaceFolder}/samples/OnvifLib.Gui",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      // Needs no camera and no credentials — the first thing to run when a connection is failing.
+      "name": "Probe: discovery only",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/samples/OnvifLib.Probe/bin/Debug/net10.0/OnvifLib.Probe.dll",
+      "args": ["--discovery", "--only", "discovery"],
+      "cwd": "${workspaceFolder}/samples/OnvifLib.Probe",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      // Prompts for the address and credentials, so nothing has to be typed into a file.
+      "name": "Probe: ask for a camera (read-only)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/samples/OnvifLib.Probe/bin/Debug/net10.0/OnvifLib.Probe.dll",
+      "args": [
+        "--ip", "${input:probeIp}",
+        "--port", "${input:probePort}",
+        "--user", "${input:probeUser}",
+        "--password", "${input:probePassword}"
+      ],
+      "cwd": "${workspaceFolder}/samples/OnvifLib.Probe",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      // Same, but also exercises the setters that undo themselves. Still never runs anything
+      // destructive — see samples/OnvifLib.Probe/README.md.
+      "name": "Probe: ask for a camera (--allow-writes)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/samples/OnvifLib.Probe/bin/Debug/net10.0/OnvifLib.Probe.dll",
+      "args": [
+        "--ip", "${input:probeIp}",
+        "--port", "${input:probePort}",
+        "--user", "${input:probeUser}",
+        "--password", "${input:probePassword}",
+        "--allow-writes"
+      ],
+      "cwd": "${workspaceFolder}/samples/OnvifLib.Probe",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      // Reads ONVIF_IP / ONVIF_PORT / ONVIF_USER / ONVIF_PASSWORD from the environment, or falls
+      // back to the constants in ProbeOptions.cs. --verbose adds the full SOAP dump on stderr.
+      "name": "Probe: from environment (--verbose)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/samples/OnvifLib.Probe/bin/Debug/net10.0/OnvifLib.Probe.dll",
+      "args": ["--verbose"],
+      "cwd": "${workspaceFolder}/samples/OnvifLib.Probe",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    }
+  ],
+  "inputs": [
+    {
+      "id": "probeIp",
+      "type": "promptString",
+      "description": "Camera address",
+      "default": "192.168.1.10"
+    },
+    {
+      "id": "probePort",
+      "type": "promptString",
+      "description": "ONVIF port",
+      "default": "80"
+    },
+    {
+      "id": "probeUser",
+      "type": "promptString",
+      "description": "User name",
+      "default": "admin"
+    },
+    {
+      "id": "probePassword",
+      "type": "promptString",
+      "description": "Password",
+      "password": true
+    }
+  ]
+}

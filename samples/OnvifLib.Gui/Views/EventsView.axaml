@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.EventsView"
+             x:DataType="vm:EventsViewModel">
+
+  <Panel Margin="8">
+
+    <Border Classes="banner" VerticalAlignment="Top" IsVisible="{Binding !IsAvailable}">
+      <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
+    </Border>
+
+    <DockPanel IsVisible="{Binding IsAvailable}">
+
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+        <Button Content="Start" Command="{Binding StartCommand}" IsEnabled="{Binding !IsReceiving}" />
+        <Button Content="Stop" Command="{Binding StopCommand}" IsEnabled="{Binding IsReceiving}" />
+        <Button Content="Clear" Command="{Binding ClearCommand}" />
+        <TextBlock Text="Pull timeout" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding PullTimeoutSeconds}" Minimum="1" Maximum="60" Increment="1"
+                       FormatString="0" Width="100" IsEnabled="{Binding !IsReceiving}" />
+        <TextBlock Text="Message limit" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding MessageLimit}" Minimum="1" Maximum="4096" Increment="64"
+                       FormatString="0" Width="110" IsEnabled="{Binding !IsReceiving}" />
+        <TextBlock Text="Keep" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding MaxRows}" Minimum="10" Maximum="5000" Increment="50"
+                       FormatString="0" Width="110" />
+      </StackPanel>
+
+      <TextBlock DockPanel.Dock="Top" Classes="hint" Margin="0,0,0,4"
+                 Text="A camera that reports nothing is normal — most only emit on motion or an I/O change. Trigger something (wave at it, toggle an input) and watch the list." />
+
+      <!-- Camera.ParseEvent: nothing on the pull path reaches it, so this is the only way to
+           exercise it from the app. -->
+      <Expander DockPanel.Dock="Bottom" Header="Camera.ParseEvent — parse a raw SOAP envelope"
+                Margin="0,8,0,0">
+        <StackPanel Spacing="4">
+          <TextBox Text="{Binding ParseInput}" Classes="mono" AcceptsReturn="True" Height="100"
+                   Watermark="paste a SOAP envelope, or leave empty to wrap the selected event above" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Parse" Command="{Binding ParseEventCommand}" />
+            <TextBlock Text="{Binding ParseResult}" VerticalAlignment="Center" TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </Expander>
+
+      <TextBox DockPanel.Dock="Bottom" Height="200" Classes="mono" IsReadOnly="True"
+               AcceptsReturn="True" Margin="0,8,0,0"
+               Text="{Binding SelectedXml, Mode=OneWay}" />
+
+      <DataGrid ItemsSource="{Binding Events}" SelectedItem="{Binding Selected}"
+                IsReadOnly="True" GridLinesVisibility="Horizontal" CanUserResizeColumns="True">
+        <DataGrid.Columns>
+          <DataGridTextColumn Header="Received" Binding="{Binding TimeText}" Width="Auto" />
+          <DataGridTextColumn Header="Topic" Binding="{Binding Topic}" Width="2*" />
+          <DataGridTextColumn Header="Producer" Binding="{Binding Producer}" Width="*" />
+        </DataGrid.Columns>
+      </DataGrid>
+
+    </DockPanel>
+  </Panel>
+</UserControl>

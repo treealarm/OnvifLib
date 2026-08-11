@@ -1,0 +1,38 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="OnvifLib.Gui.App"
+             RequestedThemeVariant="Default">
+
+  <Application.Styles>
+    <FluentTheme />
+    <!-- DataGrid ships its theme separately from the Fluent theme. Without this every grid in
+         the app renders as an empty box with no error anywhere. -->
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,8,0,4" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="Opacity" Value="0.7" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBox.mono">
+      <Setter Property="FontFamily" Value="Consolas,Menlo,DejaVu Sans Mono,monospace" />
+    </Style>
+    <Style Selector="TextBlock.mono">
+      <Setter Property="FontFamily" Value="Consolas,Menlo,DejaVu Sans Mono,monospace" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#D13438" />
+    </Style>
+    <Style Selector="Border.banner">
+      <Setter Property="Background" Value="#22808080" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+  </Application.Styles>
+
+</Application>

@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.DeviceIoView"
+             x:DataType="vm:DeviceIoViewModel">
+
+  <Panel Margin="8">
+
+    <Border Classes="banner" VerticalAlignment="Top" IsVisible="{Binding !IsAvailable}">
+      <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
+    </Border>
+
+    <Grid IsVisible="{Binding IsAvailable}" ColumnDefinitions="*,12,*">
+
+      <!-- Relays: read and driven through Camera (Device Management), options through DeviceIO -->
+      <DockPanel Grid.Column="0">
+        <TextBlock DockPanel.Dock="Top" Classes="section" Text="Relay outputs" />
+        <TextBlock DockPanel.Dock="Top" Classes="hint"
+                   Text="Read and switched through Device Management (Camera), while their options come from the Device I/O service — an easy split to trip over when wiring this up." />
+        <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshRelaysCommand}"
+                HorizontalAlignment="Left" Margin="0,4,0,4" />
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding EditMode}" Width="130" />
+            <ComboBox ItemsSource="{Binding IdleStates}" SelectedItem="{Binding EditIdleState}" Width="110" />
+            <NumericUpDown Value="{Binding EditDelayMs}" Minimum="0" Maximum="600000" Increment="100"
+                           FormatString="0" Width="130" />
+            <Button Content="Apply settings" Command="{Binding ApplyRelaySettingsCommand}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Switch on" Command="{Binding ActivateRelayCommand}" />
+            <Button Content="Switch off" Command="{Binding DeactivateRelayCommand}" />
+            <TextBlock Text="{Binding LastRelayCommand}" VerticalAlignment="Center" Opacity="0.7" />
+          </StackPanel>
+          <TextBlock Classes="hint"
+                     Text="ONVIF exposes no way to read a relay's current state, so this can only show the last command that was sent — never a live indicator. Switching one actuates whatever is physically wired to it, so it asks first." />
+        </StackPanel>
+
+        <Grid RowDefinitions="*,4,*">
+          <DataGrid Grid.Row="0" ItemsSource="{Binding Relays}" SelectedItem="{Binding SelectedRelay}"
+                    IsReadOnly="True" GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+              <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto" />
+              <DataGridTextColumn Header="Idle" Binding="{Binding IdleState}" Width="Auto" />
+              <DataGridTextColumn Header="Delay ms" Binding="{Binding DelayMs}" Width="Auto" />
+            </DataGrid.Columns>
+          </DataGrid>
+          <DataGrid Grid.Row="2" ItemsSource="{Binding RelayOptions}" IsReadOnly="True"
+                    GridLinesVisibility="Horizontal">
+            <DataGrid.Columns>
+              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+              <DataGridCheckBoxColumn Header="Discrete" Binding="{Binding Discrete}" Width="Auto" />
+              <DataGridTextColumn Header="Min ms" Binding="{Binding MinDelayMs}" Width="Auto" />
+              <DataGridTextColumn Header="Max ms" Binding="{Binding MaxDelayMs}" Width="Auto" />
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </DockPanel>
+
+      <!-- Digital inputs -->
+      <DockPanel Grid.Column="2">
+        <TextBlock DockPanel.Dock="Top" Classes="section" Text="Digital inputs" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,4,0,4">
+          <Button Content="Refresh" Command="{Binding RefreshInputsCommand}" />
+          <Button Content="Options" Command="{Binding LoadInputOptionsCommand}" />
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Top" Classes="hint" Text="{Binding InputOptionsText}" />
+
+        <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <ComboBox ItemsSource="{Binding IdleStates}" SelectedItem="{Binding InputIdleState}" Width="110" />
+            <Button Content="Apply idle state" Command="{Binding ApplyInputIdleStateCommand}" />
+          </StackPanel>
+          <TextBlock Classes="hint"
+                     Text="An input's live level is not readable either — a camera reports a change as an event, which is what the Events tab is for." />
+        </StackPanel>
+
+        <DataGrid ItemsSource="{Binding Inputs}" SelectedItem="{Binding SelectedInput}"
+                  IsReadOnly="True" GridLinesVisibility="Horizontal">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+            <DataGridTextColumn Header="Idle state" Binding="{Binding IdleState}" Width="Auto" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </DockPanel>
+
+    </Grid>
+  </Panel>
+</UserControl>

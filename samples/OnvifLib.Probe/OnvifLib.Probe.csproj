@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Matches the library, which moved to net10.0 in 1.1.0. A project cannot reference a
+         library on a newer target framework, so this must track OnvifLib.csproj. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OnvifLib.Probe</RootNamespace>
+    <AssemblyName>OnvifLib.Probe</AssemblyName>
+
+    <!-- Sample: must never produce or publish a NuGet package. The library sets
+         GeneratePackageOnBuild=true and CI pushes "**/*.nupkg", so leaving these at their
+         defaults would risk uploading the sample to nuget.org. -->
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- System.ServiceModel.* builds channels, serializers and the generated *ClientChannel
+         proxies by reflection, with no trim annotations. A trimmed or AOT build launches and
+         then fails on the first SOAP call. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
+
+    <!-- Camera lives in the global namespace; CS8981 is the warning the library already
+         suppresses for the same reason. -->
+    <NoWarn>$(NoWarn);CS8981</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\OnvifLib.csproj" />
+  </ItemGroup>
+
+</Project>

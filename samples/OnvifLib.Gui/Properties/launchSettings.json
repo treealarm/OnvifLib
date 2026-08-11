@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "OnvifLib.Gui": {
+      "commandName": "Project"
+    },
+    "self-test": {
+      "commandName": "Project",
+      "commandLineArgs": "--selftest"
+    }
+  }
+}
