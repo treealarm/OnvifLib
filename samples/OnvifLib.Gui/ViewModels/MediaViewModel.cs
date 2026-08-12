@@ -195,7 +195,10 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     var full = WithCredentials(uri);
     try
     {
-      ExternalPlayer.Launch(player, full);
+      ExternalPlayer.Launch(player, full,
+        // Arrives from a timer thread a few seconds later, so it is marshalled back.
+        message => Avalonia.Threading.Dispatcher.UIThread.Post(() => Runner.Report(message, isError: true)));
+
       // Never the real URI: the log is saved and shared.
       Runner.Report($"Launched {player.Name} with {RtspCredentials.Mask(full)}");
     }

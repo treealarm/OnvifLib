@@ -52,7 +52,20 @@ this app shows video two ways, neither of which needs a native media dependency:
   the public `MediaService.DownloadImageAsync` so any other snapshot URI can still be fetched.
 - **An external player.** The app finds `vlc`, `ffplay` or `mpv` on `PATH` (plus VLC's standard
   install locations on Windows), splices the credentials into the RTSP URI, and launches it.
-  There is a box for a player path if yours is somewhere unusual.
+  There is a box for a player path if yours is somewhere unusual, and a drop-down to pick between
+  the ones that were found.
+
+  The default differs by platform for an empirical reason: **the VLC packaged for current Debian
+  and Ubuntu no longer ships the live555 demuxer**, so it cannot open a plain RTSP stream at all —
+  it falls back to the satip and realrtsp modules and fails to connect, no matter which options it
+  is given. `ffplay` carries its own RTSP support in libavformat and works, so it leads on Linux;
+  the official Windows VLC build still has live555 and leads there.
+
+  For the same reason the transport preference is passed to VLC as the MRL option `:rtsp-tcp`
+  rather than the global `--rtsp-tcp` flag. That flag belongs to live555, and a VLC built without
+  it rejects the unknown option and refuses to start — an MRL option no module claims is simply
+  ignored. A player that starts and then dies is reported in the status bar, so this kind of
+  failure is visible in the app rather than only to whoever launched it from a terminal.
 
 **The password is passed to the player on its command line**, so it is visible in `ps` or Task
 Manager. VLC's `--rtsp-pwd` is no better (same `argv`) and ffplay has no alternative, so the app
