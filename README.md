@@ -8,6 +8,8 @@
 
 📂 **Source code:** [github.com/treealarm/OnvifLib](https://github.com/treealarm/OnvifLib) — issues and pull requests welcome.
 
+🖥 **Desktop GUI (Linux x64):** [Releases](https://github.com/treealarm/OnvifLib/releases) — Avalonia test bench with in-window video (`ffmpeg` included).
+
 ---
 
 ## 🚀 Features

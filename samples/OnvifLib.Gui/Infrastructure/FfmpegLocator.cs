@@ -6,8 +6,8 @@ namespace OnvifLib.Gui.Infrastructure;
 /// Resolves the ffmpeg binary used for in-window playback.
 /// </summary>
 /// <remarks>
-/// Order: PATH, then a previously downloaded copy under the app data directory, then a path the
-/// user typed. The library NuGet never ships a binary; this sample finds or downloads one.
+/// Order: next to the app (release zips ship one), PATH, a previously downloaded copy under the
+/// app data directory, then a path the user typed. The library NuGet never ships a binary.
 /// </remarks>
 public static class FfmpegLocator
 {
@@ -22,10 +22,15 @@ public static class FfmpegLocator
     RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg";
 
   /// <summary>
-  /// Returns an existing ffmpeg, or null if none of the three sources has one. Does not download.
+  /// Returns an existing ffmpeg, or null if none of the sources has one. Does not download.
   /// </summary>
   public static string? Find(string? configuredPath = null)
   {
+    foreach (var candidate in SidecarCandidates())
+    {
+      if (File.Exists(candidate)) return candidate;
+    }
+
     var fromPath = ExecutableSearch.Find(BinaryFileName);
     if (fromPath is not null) return fromPath;
 
@@ -35,6 +40,14 @@ public static class FfmpegLocator
       return configuredPath;
 
     return null;
+  }
+
+  /// <summary>Release layouts put ffmpeg beside the executable or under <c>ffmpeg/</c>.</summary>
+  public static IEnumerable<string> SidecarCandidates()
+  {
+    var root = AppContext.BaseDirectory;
+    yield return Path.Combine(root, BinaryFileName);
+    yield return Path.Combine(root, "ffmpeg", BinaryFileName);
   }
 
   public static string? DescribeMissing()

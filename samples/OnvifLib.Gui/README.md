@@ -13,6 +13,9 @@ decodes video, and only here.
 
 ## Running it
 
+Prebuilt **Linux x64** zip (includes an LGPL `ffmpeg` next to the app):
+[GitHub Releases](https://github.com/treealarm/OnvifLib/releases).
+
 ```bash
 dotnet run --project samples/OnvifLib.Gui
 ```
