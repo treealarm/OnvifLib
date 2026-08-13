@@ -113,11 +113,20 @@ jobs:
           test -f dist/OnvifLib.Gui-win-x64.zip
           ls -lh dist/*.zip
 
+      - name: Release meta
+        id: meta
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${GITHUB_REF_NAME}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=OnvifLib.Gui ${TAG#gui-}" >> "$GITHUB_OUTPUT"
+
       - name: Create or update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag != '' && github.event.inputs.tag || github.ref_name }}
-          name: OnvifLib.Gui ${{ github.event.inputs.tag != '' && github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
           files: |
             dist/OnvifLib.Gui-linux-x64.zip
             dist/OnvifLib.Gui-win-x64.zip
