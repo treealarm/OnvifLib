@@ -101,53 +101,50 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: dist
           merge-multiple: true
 
-      - name: Create or update GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Locate zips
+        id: zips
         run: |
           set -euo pipefail
-          TAG="${{ github.event.inputs.tag }}"
-          if [ -z "$TAG" ]; then
-            TAG="${GITHUB_REF_NAME}"
-          fi
-          ls -lh artifacts/
-          NOTES=$(cat <<'EOF'
-          ## OnvifLib.Gui
+          find dist -type f -name 'OnvifLib.Gui-*.zip' -print
+          test -f dist/OnvifLib.Gui-linux-x64.zip
+          test -f dist/OnvifLib.Gui-win-x64.zip
+          ls -lh dist/*.zip
 
-          Desktop ONVIF device manager (Avalonia): discover/add cameras, live video, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag != '' && github.event.inputs.tag || github.ref_name }}
+          name: OnvifLib.Gui ${{ github.event.inputs.tag != '' && github.event.inputs.tag || github.ref_name }}
+          files: |
+            dist/OnvifLib.Gui-linux-x64.zip
+            dist/OnvifLib.Gui-win-x64.zip
+          fail_on_unmatched_files: true
+          body: |
+            ## OnvifLib.Gui
 
-          ### Downloads
-          - **OnvifLib.Gui-linux-x64.zip** — Ubuntu / Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
-          - **OnvifLib.Gui-win-x64.zip** — Windows x64, self-contained .NET 10 + LGPL `ffmpeg.exe`
+            Desktop ONVIF device manager (Avalonia): discover/add cameras, live video, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
 
-          Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app — no separate install for in-window playback.
+            ### Downloads
+            - **OnvifLib.Gui-linux-x64.zip** — Ubuntu / Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
+            - **OnvifLib.Gui-win-x64.zip** — Windows x64, self-contained .NET 10 + LGPL `ffmpeg.exe`
 
-          ### Run (Linux)
-          ```bash
-          unzip OnvifLib.Gui-linux-x64.zip
-          cd OnvifLib.Gui-linux-x64
-          ./OnvifLib.Gui
-          ```
+            Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app — no separate install for in-window playback.
 
-          ### Run (Windows)
-          Unzip `OnvifLib.Gui-win-x64.zip` and run `OnvifLib.Gui.exe`.
+            ### Run (Linux)
+            ```bash
+            unzip OnvifLib.Gui-linux-x64.zip
+            cd OnvifLib.Gui-linux-x64
+            ./OnvifLib.Gui
+            ```
 
-          The library NuGet remains separate: `dotnet add package OnvifLib`.
+            ### Run (Windows)
+            Unzip `OnvifLib.Gui-win-x64.zip` and run `OnvifLib.Gui.exe`.
 
-          ### Notes
-          - Linux needs a desktop session (X11/Wayland).
-          - App is MIT; bundled `ffmpeg` is LGPL — see `ffmpeg/README.txt`.
-          EOF
-          )
-          ASSETS=(artifacts/OnvifLib.Gui-linux-x64.zip artifacts/OnvifLib.Gui-win-x64.zip)
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${ASSETS[@]}" --clobber
-            gh release edit "$TAG" --notes "$NOTES" --title "OnvifLib.Gui ${TAG#gui-}"
-          else
-            gh release create "$TAG" "${ASSETS[@]}" \
-              --title "OnvifLib.Gui ${TAG#gui-}" \
-              --notes "$NOTES"
-          fi
+            The library NuGet remains separate: `dotnet add package OnvifLib`.
+
+            ### Notes
+            - Linux needs a desktop session (X11/Wayland).
+            - App is MIT; bundled `ffmpeg` is LGPL — see `ffmpeg/README.txt`.
