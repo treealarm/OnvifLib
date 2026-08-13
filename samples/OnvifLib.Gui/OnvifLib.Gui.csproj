@@ -77,11 +77,11 @@
        Linux CI still uses the release workflow's bash step (tar.xz). -->
   <Target Name="BundleFfmpegAfterPublish"
           AfterTargets="Publish"
-          Condition="'$(RuntimeIdentifier)' == 'win-x64' AND $([MSBuild]::IsOSPlatform('Windows'))">
+          Condition="'$(RuntimeIdentifier)' == 'win-x64' AND $([MSBuild]::IsOSPlatform('Windows')) AND !Exists('$(PublishDir)ffmpeg\ffmpeg.exe')">
     <PropertyGroup>
-      <_FfmpegDestDir>$([System.IO.Path]::GetFullPath($([System.String]::Copy('$(PublishDir)').Trim().TrimEnd('\'))))</_FfmpegDestDir>
+      <_FfmpegDestDir>$([System.IO.Path]::GetFullPath('$(PublishDir)').TrimEnd('/').TrimEnd('\'))</_FfmpegDestDir>
     </PropertyGroup>
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\OnvifLib.Gui.Setup\bundle-ffmpeg.ps1&quot; -DestinationDir &quot;$(_FfmpegDestDir)&quot; -Url &quot;$(FfmpegWinX64Url)&quot; -Sha256 &quot;$(FfmpegWinX64Sha256)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\OnvifLib.Gui.Setup\bundle-ffmpeg.ps1&quot; -DestinationDir '$(_FfmpegDestDir)' -Url '$(FfmpegWinX64Url)' -Sha256 '$(FfmpegWinX64Sha256)'" />
   </Target>
 
 </Project>

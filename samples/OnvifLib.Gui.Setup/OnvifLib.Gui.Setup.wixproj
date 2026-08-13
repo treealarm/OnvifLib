@@ -30,12 +30,16 @@
       Text="Publish the GUI first (self-contained win-x64) into '$(GuiPublishDir)'. Missing OnvifLib.Gui.exe." />
   </Target>
 
-  <Target Name="BundleFfmpeg" BeforeTargets="BeforeBuild">
-    <!-- Trailing backslash + double quotes eats -Url/-Sha256 in powershell.exe. -->
+  <Target Name="BundleFfmpeg" BeforeTargets="BeforeBuild" Condition="!Exists('$(GuiPublishDir)ffmpeg\ffmpeg.exe')">
+    <!-- Never put a trailing \ immediately before " — powershell.exe treats \" as an escaped quote
+         and then -Url/-Sha256 disappear. Use single-quoted args and a slash-trimmed path. -->
     <PropertyGroup>
-      <_FfmpegDestDir>$([System.IO.Path]::GetFullPath($([System.String]::Copy('$(GuiPublishDir)').Trim().TrimEnd('\'))))</_FfmpegDestDir>
+      <_FfmpegDestDir>$([System.IO.Path]::GetFullPath('$(GuiPublishDir)').TrimEnd('/').TrimEnd('\'))</_FfmpegDestDir>
     </PropertyGroup>
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)bundle-ffmpeg.ps1&quot; -DestinationDir &quot;$(_FfmpegDestDir)&quot; -Url &quot;$(FfmpegWinX64Url)&quot; -Sha256 &quot;$(FfmpegWinX64Sha256)&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)bundle-ffmpeg.ps1&quot; -DestinationDir '$(_FfmpegDestDir)' -Url '$(FfmpegWinX64Url)' -Sha256 '$(FfmpegWinX64Sha256)'" />
+  </Target>
+
+  <Target Name="RequireBundledFfmpeg" AfterTargets="BundleFfmpeg" BeforeTargets="BeforeBuild">
     <Error
       Condition="!Exists('$(GuiPublishDir)ffmpeg\ffmpeg.exe')"
       Text="ffmpeg.exe was not copied into '$(GuiPublishDir)ffmpeg\'. The MSI would install an app that cannot play video." />
