@@ -114,10 +114,16 @@ jobs:
       - name: Unpack payload
         shell: pwsh
         run: |
-          Expand-Archive -Path dist/OnvifLib.Gui-win-x64.zip -DestinationPath artifacts -Force
+          Get-ChildItem -Recurse dist | Select-Object FullName, Length | Format-Table -AutoSize
+          $zip = Get-ChildItem -Recurse dist -Filter 'OnvifLib.Gui-win-x64.zip' |
+            Select-Object -First 1
+          if (-not $zip) { throw "OnvifLib.Gui-win-x64.zip not found under dist/" }
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath artifacts -Force
           if (-not (Test-Path artifacts/OnvifLib.Gui-win-x64/OnvifLib.Gui.exe)) {
+            Get-ChildItem -Recurse artifacts | Select-Object FullName | Format-Table -AutoSize
             throw "expected artifacts/OnvifLib.Gui-win-x64/OnvifLib.Gui.exe after unzip"
           }
+          Test-Path artifacts/OnvifLib.Gui-win-x64/ffmpeg/ffmpeg.exe
 
       - name: MSI version
         id: ver
@@ -136,11 +142,15 @@ jobs:
       - name: Build MSI
         shell: pwsh
         run: |
-          $publish = (Resolve-Path artifacts/OnvifLib.Gui-win-x64).Path
+          # Forward slashes: MSBuild -p: with Windows backslashes mangles the path.
+          $publish = ((Resolve-Path artifacts/OnvifLib.Gui-win-x64).Path -replace '\\','/') + '/'
+          Write-Host "GuiPublishDir=$publish"
+          Write-Host "exe=$(Test-Path (Join-Path $publish 'OnvifLib.Gui.exe')) ffmpeg=$(Test-Path (Join-Path $publish 'ffmpeg/ffmpeg.exe'))"
           dotnet build samples/OnvifLib.Gui.Setup/OnvifLib.Gui.Setup.wixproj `
             -c Release `
-            -p:GuiPublishDir=$publish `
-            -p:Version=${{ steps.ver.outputs.version }} `
+            -p:Platform=x64 `
+            "-p:GuiPublishDir=$publish" `
+            "-p:Version=${{ steps.ver.outputs.version }}" `
             --nologo
           $msi = Get-ChildItem -Recurse samples/OnvifLib.Gui.Setup/bin -Filter OnvifLib.Gui.msi |
             Select-Object -First 1
