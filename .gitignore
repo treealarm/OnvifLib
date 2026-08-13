@@ -238,3 +238,5 @@ _Pvt_Extensions
 # SQL Server files
 *.map
 *.js
+# Local publish / release staging
+artifacts/

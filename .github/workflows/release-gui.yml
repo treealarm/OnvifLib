@@ -1,0 +1,108 @@
+name: Release GUI
+
+on:
+  push:
+    tags:
+      - "gui-*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (e.g. gui-1.0.0). Leave empty to use the pushed tag only."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish OnvifLib.Gui (linux-x64)
+        run: |
+          set -euo pipefail
+          OUT=artifacts/OnvifLib.Gui-linux-x64
+          mkdir -p artifacts
+          dotnet publish samples/OnvifLib.Gui/OnvifLib.Gui.csproj \
+            -c Release -r linux-x64 --self-contained true \
+            -o "$OUT" \
+            -p:PublishSingleFile=false \
+            -p:DebugType=None \
+            -p:DebugSymbols=false \
+            --nologo
+
+      - name: Bundle LGPL ffmpeg
+        run: |
+          set -euo pipefail
+          OUT=artifacts/OnvifLib.Gui-linux-x64
+          URL='https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz'
+          SHA='2fc7aa2eb6e75807170a34fec11af8eea3bc39875cf001d26eabc1605de99a87'
+          ARCHIVE=artifacts/ffmpeg-linux64-lgpl.tar.xz
+          STAGE=artifacts/ffmpeg-stage
+          curl -fsSL -o "$ARCHIVE" "$URL"
+          echo "$SHA  $ARCHIVE" | sha256sum -c -
+          mkdir -p "$STAGE"
+          tar -xJf "$ARCHIVE" -C "$STAGE"
+          BIN=$(find "$STAGE" -type f -name ffmpeg | head -n1)
+          test -n "$BIN"
+          mkdir -p "$OUT/ffmpeg"
+          cp "$BIN" "$OUT/ffmpeg/ffmpeg"
+          chmod +x "$OUT/ffmpeg/ffmpeg"
+          cat > "$OUT/ffmpeg/README.txt" <<'EOF'
+          Bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds (n7.1.x).
+          Source and licenses: https://github.com/BtbN/FFmpeg-Builds
+          The OnvifLib.Gui app itself is MIT; this binary is LGPL.
+          EOF
+
+      - name: Zip
+        run: |
+          set -euo pipefail
+          cd artifacts
+          zip -qr OnvifLib.Gui-linux-x64.zip OnvifLib.Gui-linux-x64
+          ls -lh OnvifLib.Gui-linux-x64.zip
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          NOTES=$(cat <<'EOF'
+          ## OnvifLib.Gui for Ubuntu / Linux x64
+
+          Desktop ONVIF device manager (Avalonia): discover/add cameras, live video, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
+
+          ### Download
+          - **OnvifLib.Gui-linux-x64.zip** — self-contained .NET 10 app + **bundled LGPL ffmpeg** (BtbN n7.1.x) under `ffmpeg/ffmpeg`
+
+          ### Run
+          ```bash
+          unzip OnvifLib.Gui-linux-x64.zip
+          cd OnvifLib.Gui-linux-x64
+          ./OnvifLib.Gui
+          ```
+
+          No separate ffmpeg install needed for in-window playback. The library NuGet remains separate: `dotnet add package OnvifLib`.
+
+          ### Notes
+          - Requires a desktop session (X11/Wayland).
+          - App is MIT; the bundled `ffmpeg` binary is LGPL — see `ffmpeg/README.txt`.
+          EOF
+          )
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" artifacts/OnvifLib.Gui-linux-x64.zip --clobber
+          else
+            gh release create "$TAG" artifacts/OnvifLib.Gui-linux-x64.zip \
+              --title "OnvifLib.Gui ${TAG#gui-} (Linux x64)" \
+              --notes "$NOTES"
+          fi
