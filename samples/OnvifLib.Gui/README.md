@@ -13,7 +13,7 @@ decodes video, and only here.
 
 ## Running it
 
-Prebuilt **Linux x64** zip (includes an LGPL `ffmpeg` next to the app):
+Prebuilt **Linux x64** and **Windows x64** zips (each includes an LGPL `ffmpeg` next to the app):
 [GitHub Releases](https://github.com/treealarm/OnvifLib/releases).
 
 ```bash

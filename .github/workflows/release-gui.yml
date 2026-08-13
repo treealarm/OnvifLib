@@ -15,8 +15,25 @@ permissions:
   contents: write
 
 jobs:
-  linux-x64:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runs_on: ubuntu-latest
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz
+            ffmpeg_sha: 2fc7aa2eb6e75807170a34fec11af8eea3bc39875cf001d26eabc1605de99a87
+            ffmpeg_archive: ffmpeg-linux64-lgpl.tar.xz
+            ffmpeg_bin: ffmpeg
+          - rid: win-x64
+            runs_on: ubuntu-latest
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-win64-lgpl-7.1.zip
+            ffmpeg_sha: 8fdbe7f03b64134fecf26166a22d4b4f5be0756901461d01fe5ad7dbc03b5ce7
+            ffmpeg_archive: ffmpeg-win64-lgpl.zip
+            ffmpeg_bin: ffmpeg.exe
+
+    runs-on: ${{ matrix.runs_on }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,13 +42,13 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Publish OnvifLib.Gui (linux-x64)
+      - name: Publish OnvifLib.Gui (${{ matrix.rid }})
         run: |
           set -euo pipefail
-          OUT=artifacts/OnvifLib.Gui-linux-x64
+          OUT="artifacts/OnvifLib.Gui-${{ matrix.rid }}"
           mkdir -p artifacts
           dotnet publish samples/OnvifLib.Gui/OnvifLib.Gui.csproj \
-            -c Release -r linux-x64 --self-contained true \
+            -c Release -r "${{ matrix.rid }}" --self-contained true \
             -o "$OUT" \
             -p:PublishSingleFile=false \
             -p:DebugType=None \
@@ -41,20 +58,22 @@ jobs:
       - name: Bundle LGPL ffmpeg
         run: |
           set -euo pipefail
-          OUT=artifacts/OnvifLib.Gui-linux-x64
-          URL='https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz'
-          SHA='2fc7aa2eb6e75807170a34fec11af8eea3bc39875cf001d26eabc1605de99a87'
-          ARCHIVE=artifacts/ffmpeg-linux64-lgpl.tar.xz
-          STAGE=artifacts/ffmpeg-stage
-          curl -fsSL -o "$ARCHIVE" "$URL"
-          echo "$SHA  $ARCHIVE" | sha256sum -c -
+          OUT="artifacts/OnvifLib.Gui-${{ matrix.rid }}"
+          ARCHIVE="artifacts/${{ matrix.ffmpeg_archive }}"
+          STAGE=artifacts/ffmpeg-stage-${{ matrix.rid }}
+          curl -fsSL -o "$ARCHIVE" "${{ matrix.ffmpeg_url }}"
+          echo "${{ matrix.ffmpeg_sha }}  $ARCHIVE" | sha256sum -c -
+          rm -rf "$STAGE"
           mkdir -p "$STAGE"
-          tar -xJf "$ARCHIVE" -C "$STAGE"
-          BIN=$(find "$STAGE" -type f -name ffmpeg | head -n1)
+          case "$ARCHIVE" in
+            *.zip) unzip -q "$ARCHIVE" -d "$STAGE" ;;
+            *) tar -xJf "$ARCHIVE" -C "$STAGE" ;;
+          esac
+          BIN=$(find "$STAGE" -type f -name '${{ matrix.ffmpeg_bin }}' | head -n1)
           test -n "$BIN"
           mkdir -p "$OUT/ffmpeg"
-          cp "$BIN" "$OUT/ffmpeg/ffmpeg"
-          chmod +x "$OUT/ffmpeg/ffmpeg"
+          cp "$BIN" "$OUT/ffmpeg/${{ matrix.ffmpeg_bin }}"
+          chmod +x "$OUT/ffmpeg/${{ matrix.ffmpeg_bin }}" || true
           cat > "$OUT/ffmpeg/README.txt" <<'EOF'
           Bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds (n7.1.x).
           Source and licenses: https://github.com/BtbN/FFmpeg-Builds
@@ -65,10 +84,27 @@ jobs:
         run: |
           set -euo pipefail
           cd artifacts
-          zip -qr OnvifLib.Gui-linux-x64.zip OnvifLib.Gui-linux-x64
-          ls -lh OnvifLib.Gui-linux-x64.zip
+          zip -qr "OnvifLib.Gui-${{ matrix.rid }}.zip" "OnvifLib.Gui-${{ matrix.rid }}"
+          ls -lh "OnvifLib.Gui-${{ matrix.rid }}.zip"
 
-      - name: Create GitHub Release
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OnvifLib.Gui-${{ matrix.rid }}
+          path: artifacts/OnvifLib.Gui-${{ matrix.rid }}.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -77,32 +113,41 @@ jobs:
           if [ -z "$TAG" ]; then
             TAG="${GITHUB_REF_NAME}"
           fi
+          ls -lh artifacts/
           NOTES=$(cat <<'EOF'
-          ## OnvifLib.Gui for Ubuntu / Linux x64
+          ## OnvifLib.Gui
 
           Desktop ONVIF device manager (Avalonia): discover/add cameras, live video, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
 
-          ### Download
-          - **OnvifLib.Gui-linux-x64.zip** — self-contained .NET 10 app + **bundled LGPL ffmpeg** (BtbN n7.1.x) under `ffmpeg/ffmpeg`
+          ### Downloads
+          - **OnvifLib.Gui-linux-x64.zip** — Ubuntu / Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
+          - **OnvifLib.Gui-win-x64.zip** — Windows x64, self-contained .NET 10 + LGPL `ffmpeg.exe`
 
-          ### Run
+          Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app — no separate install for in-window playback.
+
+          ### Run (Linux)
           ```bash
           unzip OnvifLib.Gui-linux-x64.zip
           cd OnvifLib.Gui-linux-x64
           ./OnvifLib.Gui
           ```
 
-          No separate ffmpeg install needed for in-window playback. The library NuGet remains separate: `dotnet add package OnvifLib`.
+          ### Run (Windows)
+          Unzip `OnvifLib.Gui-win-x64.zip` and run `OnvifLib.Gui.exe`.
+
+          The library NuGet remains separate: `dotnet add package OnvifLib`.
 
           ### Notes
-          - Requires a desktop session (X11/Wayland).
-          - App is MIT; the bundled `ffmpeg` binary is LGPL — see `ffmpeg/README.txt`.
+          - Linux needs a desktop session (X11/Wayland).
+          - App is MIT; bundled `ffmpeg` is LGPL — see `ffmpeg/README.txt`.
           EOF
           )
+          ASSETS=(artifacts/OnvifLib.Gui-linux-x64.zip artifacts/OnvifLib.Gui-win-x64.zip)
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" artifacts/OnvifLib.Gui-linux-x64.zip --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+            gh release edit "$TAG" --notes "$NOTES" --title "OnvifLib.Gui ${TAG#gui-}"
           else
-            gh release create "$TAG" artifacts/OnvifLib.Gui-linux-x64.zip \
-              --title "OnvifLib.Gui ${TAG#gui-} (Linux x64)" \
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "OnvifLib.Gui ${TAG#gui-}" \
               --notes "$NOTES"
           fi
