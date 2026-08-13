@@ -27,11 +27,80 @@
     <Style Selector="TextBlock.error">
       <Setter Property="Foreground" Value="#D13438" />
     </Style>
+    <Style Selector="ListBoxItem TextBlock.error">
+      <Setter Property="Foreground" Value="#D13438" />
+    </Style>
     <Style Selector="Border.banner">
       <Setter Property="Background" Value="#22808080" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="12,8" />
       <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#332264D8" />
+    </Style>
+    <Style Selector="ListBoxItem:selected">
+      <Setter Property="BorderBrush" Value="#FF2264D8" />
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="Padding" Value="5,4,8,4" />
+    </Style>
+    <Style Selector="DataGrid">
+      <Setter Property="MinHeight" Value="80" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+      <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+    </Style>
+    <!-- Spinner buttons steal the width of narrow fields (PTZ ±1.00 looked like arrows only). -->
+    <Style Selector="NumericUpDown">
+      <Setter Property="ShowButtonSpinner" Value="False" />
+      <Setter Property="AllowSpin" Value="False" />
+      <Setter Property="MinWidth" Value="72" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Button.tab-scroll">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="MinWidth" Value="28" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+    </Style>
+    <!-- Default tab strip is a WrapPanel. Keep one line; overflow is reached with ◀ ▶, not a scrollbar. -->
+    <Style Selector="TabControl">
+      <Setter Property="ItemsPanel">
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+      </Setter>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <DockPanel>
+              <Grid DockPanel.Dock="{TemplateBinding TabStripPlacement}"
+                    ColumnDefinitions="Auto,*,Auto">
+                <Button Name="PART_ScrollLeft" Grid.Column="0" Classes="tab-scroll"
+                        Content="◀" ToolTip.Tip="Previous tabs" />
+                <ScrollViewer Name="PART_TabScroll" Grid.Column="1"
+                              HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled"
+                              HorizontalAlignment="Stretch">
+                  <ItemsPresenter Name="PART_ItemsPresenter"
+                                  ItemsPanel="{TemplateBinding ItemsPanel}" />
+                </ScrollViewer>
+                <Button Name="PART_ScrollRight" Grid.Column="2" Classes="tab-scroll"
+                        Content="▶" ToolTip.Tip="More tabs" />
+              </Grid>
+              <ContentPresenter Name="PART_SelectedContentHost"
+                                Margin="{TemplateBinding Padding}"
+                                HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Content="{TemplateBinding SelectedContent}"
+                                ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+            </DockPanel>
+          </Border>
+        </ControlTemplate>
+      </Setter>
     </Style>
   </Application.Styles>
 

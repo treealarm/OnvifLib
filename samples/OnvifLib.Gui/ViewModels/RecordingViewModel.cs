@@ -29,10 +29,12 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
   [ObservableProperty] private OnvifEdgeRecordingJob? _selectedJob;
 
   [ObservableProperty]
-  [NotifyPropertyChangedFor(nameof(SelectedFoundToken))]
+  [NotifyPropertyChangedFor(nameof(SelectedFoundLabel))]
   private OnvifEdgeRecording? _selectedFound;
 
-  public string SelectedFoundToken => SelectedFound?.RecordingToken ?? "";
+  public string SelectedFoundLabel => SelectedFound is { } found
+    ? string.IsNullOrWhiteSpace(found.SourceName) ? found.RecordingToken : found.SourceName
+    : "";
 
   [ObservableProperty] private string _clockText = "clock offset not measured — measure it on the Device tab";
   [ObservableProperty] private string _capabilitiesText = "not read";
@@ -51,12 +53,23 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
   /// <summary>Set by the shell so playback can reuse the Media tab's player and credentials.</summary>
   public MediaViewModel? Media { get; set; }
 
+  /// <summary>Archive-only player. Live video stays on the Live/Media/PTZ tabs.</summary>
+  public VideoPlayerViewModel? Video { get; set; }
+
   protected override string? DescribeUnavailability(CameraSession session) =>
     session.Recording is null && session.Search is null && session.Replay is null
       ? "This camera advertises none of the Profile G services (recording, search, replay), so it keeps no archive we can reach."
       : null;
 
   protected override void OnConnected(CameraSession session) => ClockText = Describe(session.ClockOffset);
+
+  public override async Task ActivateAsync()
+  {
+    if (!IsAvailable) return;
+    await LoadRecordingsAsync();
+    await LoadSummaryAsync();
+    await LoadReplayCapabilitiesAsync();
+  }
 
   protected override void OnCleared()
   {
@@ -68,12 +81,13 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
     Tracks.Clear();
     ReplayUri = "";
     CapabilitiesText = SummaryText = ReplayCapabilitiesText = "not read";
+    _ = Video?.StopInternalAsync();
   }
 
-  public override Task ShutdownAsync()
+  public override async Task ShutdownAsync()
   {
     _searchCancellation?.Cancel();
-    return Task.CompletedTask;
+    if (Video is not null) await Video.StopInternalAsync();
   }
 
   private static string Describe(TimeSpan offset) => offset == TimeSpan.Zero
@@ -123,11 +137,11 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
     if (Session?.Recording is not { } recording || SelectedJob is not { } job) return;
 
     if (!await dialogs.ConfirmAsync($"Set the recording job to {mode}",
-          $"Job {job.JobToken} controls whether the camera records to its own storage.\n\n" +
+          $"This job controls whether the camera records to its own storage.\n\n" +
           $"Setting it to {mode} {(mode == "Idle" ? "stops recording — footage from now on will not exist" : "starts recording")}."))
       return;
 
-    if (await Runner.RunAsync($"SetRecordingJobMode [{job.JobToken}] = {mode}",
+    if (await Runner.RunAsync($"SetRecordingJobMode = {mode}",
           () => recording.SetRecordingJobModeAsync(job.JobToken, mode)))
       await LoadRecordingsAsync();
   }
@@ -138,11 +152,11 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
     if (Session?.Recording is not { } recording || SelectedRecording is not { } target) return;
 
     if (!await dialogs.ConfirmAsync("Delete a recording",
-          $"Delete recording {target.RecordingToken} from the camera's storage?\n\n" +
+          $"Delete “{(string.IsNullOrWhiteSpace(target.SourceName) ? "this recording" : target.SourceName)}” from the camera's storage?\n\n" +
           "The footage is erased on the device. There is no undo."))
       return;
 
-    if (await Runner.RunAsync($"DeleteRecording [{target.RecordingToken}]",
+    if (await Runner.RunAsync($"DeleteRecording [{(string.IsNullOrWhiteSpace(target.SourceName) ? "recording" : target.SourceName)}]",
           () => recording.DeleteRecordingAsync(target.RecordingToken)))
       await LoadRecordingsAsync();
   }
@@ -206,6 +220,7 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
   {
     Tracks.Clear();
     if (value is null) return;
+    _ = LoadRecordingInformationAsync();
     foreach (var track in value.Tracks) Tracks.Add(track);
   }
 
@@ -214,9 +229,16 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
   {
     if (Session?.Search is not { } search || SelectedFound is not { } found) return;
 
-    var (ok, info) = await Runner.RunAsync($"GetRecordingInformation [{found.RecordingToken}]",
+    var label = string.IsNullOrWhiteSpace(found.SourceName) ? found.RecordingToken : found.SourceName;
+    var (ok, info) = await Runner.RunAsync($"GetRecordingInformation [{label}]",
       () => search.GetRecordingInformationAsync(found.RecordingToken));
     if (!ok) return;
+
+    if (info is not null)
+    {
+      Tracks.Clear();
+      foreach (var track in info.Tracks) Tracks.Add(track);
+    }
 
     SummaryText = info is null
       ? "the camera returned no information for that recording"
@@ -245,17 +267,36 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
   private async Task PlayReplayAsync()
   {
     if (Session?.Replay is not { } replay) return;
-    if (RecordingTokenForReplay is not { } token) { Runner.Report("Select a recording first", isError: true); return; }
+    if (RecordingTokenForReplay is not { } token)
+    {
+      Runner.Report("Select a recording from Search results or the list on the left first", isError: true);
+      return;
+    }
 
+    if (Video is null)
+    {
+      Runner.Report("In-window player is not available", isError: true);
+      return;
+    }
+
+    var label = ReplayLabel;
     // Always fetched fresh. Replay URIs are frequently single-use, so there is deliberately no
     // path in this app that plays a cached one.
-    var (ok, uri) = await Runner.RunAsync($"GetReplayUri [{token}]", () => replay.GetReplayUriAsync(token, Transport));
+    var (ok, uri) = await Runner.RunAsync($"GetReplayUri [{label}]", () => replay.GetReplayUriAsync(token, Transport));
     if (!ok || uri is not { Length: > 0 }) return;
 
-    ReplayUri = RtspCredentials.Mask(Media?.WithCredentials(uri) ?? uri);
-    Media?.PlayReplay(uri);
+    var withCredentials = Media?.WithCredentials(uri) ?? uri;
+    ReplayUri = RtspCredentials.Mask(withCredentials);
+    await Video.PlayUriAsync(withCredentials);
   }
 
   private string? RecordingTokenForReplay =>
     SelectedFound?.RecordingToken ?? SelectedRecording?.RecordingToken;
+
+  private string ReplayLabel =>
+    SelectedFound is { } found
+      ? (string.IsNullOrWhiteSpace(found.SourceName) ? "recording" : found.SourceName)
+      : SelectedRecording is { } recording
+        ? (string.IsNullOrWhiteSpace(recording.SourceName) ? "recording" : recording.SourceName)
+        : "recording";
 }

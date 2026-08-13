@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             xmlns:views="using:OnvifLib.Gui.Views"
              x:Class="OnvifLib.Gui.Views.PtzView"
              x:DataType="vm:PtzViewModel">
 
@@ -10,74 +11,69 @@
       <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
     </Border>
 
-    <ScrollViewer IsVisible="{Binding IsAvailable}">
-      <Grid ColumnDefinitions="Auto,16,*">
+    <Grid IsVisible="{Binding IsAvailable}" ColumnDefinitions="Auto,12,*">
 
-        <StackPanel Grid.Column="0" Spacing="4">
-          <!-- Nothing on this tab does anything without a profile, so the reason is stated up
-               front rather than left to a silent no-op when a button is pressed. -->
-          <Border Classes="banner" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <TextBlock Classes="hint error" Text="{Binding Hint}" />
-          </Border>
+      <StackPanel Grid.Column="0" Spacing="4" Width="340">
+        <Border Classes="banner" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <TextBlock Classes="hint error" Text="{Binding Hint}" />
+        </Border>
 
-          <TextBlock Classes="section" Text="Profile" />
-          <TextBlock Text="{Binding ProfileText}" Classes="hint" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Read capabilities" Command="{Binding LoadCapabilitiesCommand}" />
-          </StackPanel>
-          <WrapPanel>
-            <CheckBox Content="Absolute" IsChecked="{Binding CanAbsolute}" IsHitTestVisible="False" Margin="0,0,10,0" />
-            <CheckBox Content="Relative" IsChecked="{Binding CanRelative}" IsHitTestVisible="False" Margin="0,0,10,0" />
-            <CheckBox Content="Continuous" IsChecked="{Binding CanContinuous}" IsHitTestVisible="False" />
-          </WrapPanel>
+        <TextBlock Classes="section" Text="Profile" Margin="0,0,0,0" />
+        <TextBlock Text="{Binding ProfileText}" Classes="hint" />
+        <Button Content="Read capabilities" Command="{Binding LoadCapabilitiesCommand}" HorizontalAlignment="Left" />
+        <WrapPanel>
+          <CheckBox Content="Absolute" IsChecked="{Binding CanAbsolute}" IsHitTestVisible="False" Margin="0,0,10,0" />
+          <CheckBox Content="Relative" IsChecked="{Binding CanRelative}" IsHitTestVisible="False" Margin="0,0,10,0" />
+          <CheckBox Content="Continuous" IsChecked="{Binding CanContinuous}" IsHitTestVisible="False" />
+        </WrapPanel>
 
-          <TextBlock Classes="section" Text="Continuous — press and hold" />
-          <TextBlock Classes="hint"
-                     Text="Movement starts on press and stops on release. The ISO-8601 timeout is the safety net: if the release never reaches the camera, it stops itself." />
-          <Grid x:Name="Pad" ColumnDefinitions="48,48,48" RowDefinitions="48,48,48" HorizontalAlignment="Left"
-                IsEnabled="{Binding HasProfile}">
-            <Button Grid.Row="0" Grid.Column="0" Content="↖" Tag="-1,1,0" />
-            <Button Grid.Row="0" Grid.Column="1" Content="↑"  Tag="0,1,0"  />
-            <Button Grid.Row="0" Grid.Column="2" Content="↗" Tag="1,1,0"  />
-            <Button Grid.Row="1" Grid.Column="0" Content="←"  Tag="-1,0,0" />
-            <Button Grid.Row="1" Grid.Column="1" Content="■"  Command="{Binding StopCommand}" />
-            <Button Grid.Row="1" Grid.Column="2" Content="→"  Tag="1,0,0"  />
-            <Button Grid.Row="2" Grid.Column="0" Content="↙" Tag="-1,-1,0" />
-            <Button Grid.Row="2" Grid.Column="1" Content="↓"  Tag="0,-1,0"  />
-            <Button Grid.Row="2" Grid.Column="2" Content="↘" Tag="1,-1,0"  />
-          </Grid>
-          <StackPanel x:Name="ZoomPad" Orientation="Horizontal" Spacing="8" IsEnabled="{Binding HasProfile}">
-            <Button Content="Zoom +" Tag="0,0,1" />
-            <Button Content="Zoom −" Tag="0,0,-1" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="Speed" VerticalAlignment="Center" />
-            <Slider Value="{Binding Speed}" Minimum="0.05" Maximum="1" Width="150" />
-            <TextBox Text="{Binding ContinuousTimeout}" Width="90" ToolTip.Tip="ISO-8601 duration, e.g. PT3S" />
-          </StackPanel>
-
-          <TextBlock Classes="section" Text="Relative" />
-          <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding HasProfile}">
-            <NumericUpDown Value="{Binding RelativePan}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="110" />
-            <NumericUpDown Value="{Binding RelativeTilt}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="110" />
-            <NumericUpDown Value="{Binding RelativeZoom}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="110" />
-            <Button Content="Move" Command="{Binding RelativeMoveCommand}" />
-          </StackPanel>
-
-          <TextBlock Classes="section" Text="Absolute" />
-          <TextBlock Classes="hint"
-                     Text="There is no way back: the library exposes no call to read the current position, so an absolute move cannot be undone. The console probe skips it for that reason." />
-          <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding HasProfile}">
-            <NumericUpDown Value="{Binding AbsolutePan}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="110" />
-            <NumericUpDown Value="{Binding AbsoluteTilt}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="110" />
-            <NumericUpDown Value="{Binding AbsoluteZoom}" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.00" Width="110" />
-            <Button Content="Move" Command="{Binding AbsoluteMoveCommand}" />
-          </StackPanel>
+        <TextBlock Classes="section" Text="Continuous — press and hold" />
+        <Grid x:Name="Pad" ColumnDefinitions="48,48,48" RowDefinitions="48,48,48" HorizontalAlignment="Left"
+              IsEnabled="{Binding HasProfile}">
+          <Button Grid.Row="0" Grid.Column="0" Content="↖" Tag="-1,1,0" />
+          <Button Grid.Row="0" Grid.Column="1" Content="↑"  Tag="0,1,0"  />
+          <Button Grid.Row="0" Grid.Column="2" Content="↗" Tag="1,1,0"  />
+          <Button Grid.Row="1" Grid.Column="0" Content="←"  Tag="-1,0,0" />
+          <Button Grid.Row="1" Grid.Column="1" Content="■"  Command="{Binding StopCommand}" />
+          <Button Grid.Row="1" Grid.Column="2" Content="→"  Tag="1,0,0"  />
+          <Button Grid.Row="2" Grid.Column="0" Content="↙" Tag="-1,-1,0" />
+          <Button Grid.Row="2" Grid.Column="1" Content="↓"  Tag="0,-1,0"  />
+          <Button Grid.Row="2" Grid.Column="2" Content="↘" Tag="1,-1,0"  />
+        </Grid>
+        <StackPanel x:Name="ZoomPad" Orientation="Horizontal" Spacing="8" IsEnabled="{Binding HasProfile}">
+          <Button Content="Zoom +" Tag="0,0,1" />
+          <Button Content="Zoom −" Tag="0,0,-1" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="Speed" VerticalAlignment="Center" />
+          <Slider Value="{Binding Speed}" Minimum="0.05" Maximum="1" Width="140" />
+          <TextBox Text="{Binding ContinuousTimeout}" Width="70" ToolTip.Tip="ISO-8601 duration, e.g. PT3S" />
         </StackPanel>
 
-        <DockPanel Grid.Column="2">
-          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Presets" />
+        <TextBlock Classes="section" Text="Relative" />
+        <StackPanel Orientation="Horizontal" Spacing="6" IsEnabled="{Binding HasProfile}">
+          <NumericUpDown Value="{Binding RelativePan}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
+          <NumericUpDown Value="{Binding RelativeTilt}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
+          <NumericUpDown Value="{Binding RelativeZoom}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
+          <Button Content="Move" Command="{Binding RelativeMoveCommand}" />
+        </StackPanel>
+
+        <TextBlock Classes="section" Text="Absolute" />
+        <StackPanel Orientation="Horizontal" Spacing="6" IsEnabled="{Binding HasProfile}">
+          <NumericUpDown Value="{Binding AbsolutePan}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
+          <NumericUpDown Value="{Binding AbsoluteTilt}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
+          <NumericUpDown Value="{Binding AbsoluteZoom}" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
+          <Button Content="Move" Command="{Binding AbsoluteMoveCommand}" />
+        </StackPanel>
+      </StackPanel>
+
+      <Grid Grid.Column="2" RowDefinitions="1.2*,8,*">
+        <Border Grid.Row="0" BorderBrush="#33808080" BorderThickness="1">
+          <views:VideoView DataContext="{Binding Video}" />
+        </Border>
+        <DockPanel Grid.Row="2">
           <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+            <TextBlock Classes="section" Text="Presets" VerticalAlignment="Center" Margin="0" />
             <Button Content="Refresh" Command="{Binding LoadPresetsCommand}" />
             <Button Content="Go to" Command="{Binding GotoPresetCommand}" />
             <Button Content="Remove" Command="{Binding RemovePresetCommand}" />
@@ -86,19 +82,15 @@
             <TextBox Text="{Binding NewPresetName}" Watermark="preset name" Width="200" />
             <Button Content="Save at current position" Command="{Binding SavePresetCommand}" />
           </StackPanel>
-          <TextBlock DockPanel.Dock="Bottom" Classes="hint"
-                     Text="Saving with a preset selected overwrites that preset; with none selected the camera creates a new one and returns its token." />
-
           <DataGrid ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
                     IsReadOnly="True" GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="Auto" />
               <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
             </DataGrid.Columns>
           </DataGrid>
         </DockPanel>
-
       </Grid>
-    </ScrollViewer>
+
+    </Grid>
   </Panel>
 </UserControl>

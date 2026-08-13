@@ -1,0 +1,62 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.VideoView"
+             x:DataType="vm:VideoPlayerViewModel">
+
+  <DockPanel>
+
+    <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,6">
+      <WrapPanel>
+        <Button Content="Play" Command="{Binding PlayCommand}" Margin="0,0,6,4"
+                IsVisible="{Binding ShowStreamPicker}"
+                ToolTip.Tip="Decode the selected profile inside this window via ffmpeg. Substream is preferred." />
+        <Button Content="Stop" Command="{Binding StopCommand}" Margin="0,0,6,4" />
+        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
+                  Width="260" Margin="0,0,6,4" PlaceholderText="no stream"
+                  IsVisible="{Binding ShowStreamPicker}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <TextBlock>
+                <TextBlock.Text>
+                  <MultiBinding StringFormat="{}{0}  {1}×{2} {3}">
+                    <Binding Path="Name" />
+                    <Binding Path="Width" />
+                    <Binding Path="Height" />
+                    <Binding Path="Encoding" />
+                  </MultiBinding>
+                </TextBlock.Text>
+              </TextBlock>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <NumericUpDown Value="{Binding FrameWidth}" Minimum="160" Maximum="1920" Increment="16"
+                       FormatString="0" Width="90" Margin="0,0,4,4" ToolTip.Tip="Decoded width" />
+        <NumericUpDown Value="{Binding FrameHeight}" Minimum="90" Maximum="1080" Increment="16"
+                       FormatString="0" Width="90" Margin="0,0,4,4" ToolTip.Tip="Decoded height" />
+        <NumericUpDown Value="{Binding FrameRate}" Minimum="1" Maximum="30" Increment="1"
+                       FormatString="0" Width="80" Margin="0,0,6,4"
+                       ToolTip.Tip="Kept for settings. Decode always takes every frame the camera sends." />
+        <Button Content="Download ffmpeg" Command="{Binding DownloadFfmpegCommand}" Margin="0,0,6,4"
+                IsEnabled="{Binding !IsDownloading}"
+                ToolTip.Tip="Fetches a pinned LGPL ffmpeg build into the app data folder. Not needed if ffmpeg is already on PATH." />
+      </WrapPanel>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" Text="{Binding Stats}" Opacity="0.7" Margin="8,0,0,0"
+                   VerticalAlignment="Center" />
+        <TextBox Text="{Binding CustomFfmpegPath}" Watermark="ffmpeg path (optional)" />
+      </DockPanel>
+      <TextBlock Text="{Binding Status}" Classes.hint="True"
+                 Classes.error="{Binding StatusIsError}" />
+    </StackPanel>
+
+    <Border BorderBrush="#33808080" BorderThickness="1" Background="#11000000" MinHeight="180">
+      <Panel>
+        <TextBlock Text="{Binding EmptyHint}" Opacity="0.4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsVisible="{Binding Frame, Converter={x:Static ObjectConverters.IsNull}}" />
+        <Image x:Name="Surface" Source="{Binding Frame}" Stretch="Uniform" />
+      </Panel>
+    </Border>
+
+  </DockPanel>
+</UserControl>

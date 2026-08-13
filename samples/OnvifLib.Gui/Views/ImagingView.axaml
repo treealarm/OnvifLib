@@ -12,14 +12,12 @@
 
     <StackPanel IsVisible="{Binding IsAvailable}" Spacing="6" MaxWidth="700" HorizontalAlignment="Left">
 
-      <TextBlock Classes="section" Text="Video source" />
-      <TextBlock Classes="hint"
-                 Text="Imaging belongs to the sensor, not the profile — this token comes from the profile selected on the Media tab." />
-      <SelectableTextBlock Text="{Binding VideoSourceToken}" Classes="mono" />
+      <TextBlock Classes="section" Text="Picture" />
+      <TextBlock Classes="hint" Text="{Binding SourceLabel}" />
 
       <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="Load ranges" Command="{Binding LoadOptionsCommand}" />
-        <Button Content="Read settings" Command="{Binding LoadSettingsCommand}" />
+        <Button Content="Reload" Command="{Binding LoadSettingsCommand}"
+                ToolTip.Tip="Read the current values from the camera again." />
         <Button Content="Apply ticked" Command="{Binding ApplyCommand}" />
       </StackPanel>
       <TextBlock Classes="hint" Text="{Binding StatusText}" />

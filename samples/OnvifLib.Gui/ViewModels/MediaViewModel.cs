@@ -14,12 +14,16 @@ namespace OnvifLib.Gui.ViewModels;
 public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
 {
   private readonly SnapshotLoop _snapshots = new();
+  private bool _loading;
 
   public MediaViewModel(OperationRunner runner, UiLogger logger) : base("Media", runner, logger)
   {
     Players = ExternalPlayer.Discover();
     SelectedPlayer = Players.FirstOrDefault();
   }
+
+  /// <summary>The shared in-window player, created by the shell.</summary>
+  public VideoPlayerViewModel? Video { get; set; }
 
   // ── profiles and streaming ─────────────────────────────────────────────────────
 
@@ -50,6 +54,8 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     StreamUri = MaskedStreamUri = "";
     StopLive();
     ProfileSelected?.Invoke(value);
+    if (!_loading && value is not null && Session?.Media is not null)
+      _ = GetStreamUriAsync();
   }
 
   // ── snapshot ───────────────────────────────────────────────────────────────────
@@ -86,6 +92,13 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     EditFrameRate = value.FrameRateLimit;
     EditBitrate = value.BitrateLimit;
     EditGovLength = value.GovLength;
+    if (!_loading && Session?.Media is not null) _ = LoadVideoOptionsAsync();
+  }
+
+  partial void OnSelectedMetadataConfigChanged(OnvifMetadataConfig? value)
+  {
+    if (!_loading && value is not null && Session?.Media is not null)
+      _ = LoadMetadataOptionsAsync();
   }
 
   // ── Profile M ──────────────────────────────────────────────────────────────────
@@ -114,14 +127,28 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
 
   protected override void OnConnected(CameraSession session)
   {
+    _loading = true;
     Profiles.Clear();
     // Safe synchronously: the profile snapshot is populated while the service initialises.
     foreach (var profile in session.Media!.GetProfiles()) Profiles.Add(profile);
     SelectedProfile = Profiles.FirstOrDefault();
+    _loading = false;
+  }
+
+  public override async Task ActivateAsync()
+  {
+    if (!IsAvailable || Session?.Media is null) return;
+    if (Profiles.Count == 0) await RefreshProfilesAsync();
+    if (SelectedProfile is not null && StreamUri.Length == 0) await GetStreamUriAsync();
+    await LoadVideoConfigsAsync();
+    await LoadAudioConfigsAsync();
+    await LoadMetadataConfigsAsync();
+    await LoadAnalyticsConfigsAsync();
   }
 
   protected override void OnCleared()
   {
+    _loading = true;
     StopLive();
     Profiles.Clear();
     VideoConfigs.Clear();
@@ -134,6 +161,7 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     StreamUri = MaskedStreamUri = "";
     SnapshotInfo = "no snapshot yet";
     SetFrame(null);
+    _loading = false;
   }
 
   public override async Task ShutdownAsync()
@@ -151,12 +179,15 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
   private async Task RefreshProfilesAsync()
   {
     if (Session?.Media is not { } media) return;
-    if (!await Runner.RunAsync("RefreshProfiles", media.RefreshProfilesAsync)) return;
+    if (!await Runner.RunAsync("Refresh profiles", media.RefreshProfilesAsync)) return;
 
     var token = SelectedProfile?.Token;
+    _loading = true;
     Profiles.Clear();
     foreach (var profile in media.GetProfiles()) Profiles.Add(profile);
     SelectedProfile = Profiles.FirstOrDefault(p => p.Token == token) ?? Profiles.FirstOrDefault();
+    _loading = false;
+    if (SelectedProfile is not null) await GetStreamUriAsync();
   }
 
   [RelayCommand]
@@ -164,7 +195,7 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
   {
     if (Session?.Media is not { } media || SelectedProfile is not { } profile) return;
 
-    var (ok, uri) = await Runner.RunAsync($"GetStreamUri [{profile.Token}]", () => media.GetStreamUri(profile.Token));
+    var (ok, uri) = await Runner.RunAsync($"GetStreamUri [{ProfileLabel(profile)}]", () => media.GetStreamUri(profile.Token));
     if (!ok || uri is null) return;
 
     StreamUri = uri;
@@ -176,10 +207,19 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
   private void PlayStream() => Play(StreamUri);
 
   /// <summary>
-  /// Plays a replay URI through the same discovered player and credentials. The caller fetches
-  /// it fresh each time: replay URIs are frequently single-use.
+  /// Plays a replay URI. Prefers the in-window player; falls back to an external one.
+  /// Replay URIs are frequently single-use, so the caller fetches them fresh each time.
   /// </summary>
-  public void PlayReplay(string uri) => Play(uri);
+  public void PlayReplay(string uri)
+  {
+    if (Video is { } video)
+    {
+      _ = video.PlayUriAsync(WithCredentials(uri));
+      return;
+    }
+
+    Play(uri);
+  }
 
   private void Play(string uri)
   {
@@ -320,16 +360,19 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     var (ok, configs) = await Runner.RunAsync("GetVideoEncoderConfigs", media.GetVideoEncoderConfigsAsync);
     if (!ok || configs is null) return;
 
+    _loading = true;
     VideoConfigs.Clear();
     foreach (var config in configs) VideoConfigs.Add(config);
     SelectedVideoConfig = VideoConfigs.FirstOrDefault();
+    _loading = false;
+    if (SelectedVideoConfig is not null) await LoadVideoOptionsAsync();
   }
 
   [RelayCommand]
   private async Task LoadVideoOptionsAsync()
   {
     if (Session?.Media is not { } media || SelectedVideoConfig is not { } config) return;
-    var (ok, options) = await Runner.RunAsync($"GetVideoEncoderConfigOptions [{config.Token}]",
+    var (ok, options) = await Runner.RunAsync($"GetVideoEncoderConfigOptions [{ConfigLabel(config.Name, config.Token)}]",
       () => media.GetVideoEncoderConfigOptionsAsync(config.Token));
     if (!ok || options is null) return;
 
@@ -351,7 +394,7 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
       GovLength = EditGovLength,
     };
 
-    if (await Runner.RunAsync($"SetVideoEncoderConfig [{config.Token}]", () => media.SetVideoEncoderConfigAsync(edited)))
+    if (await Runner.RunAsync($"SetVideoEncoderConfig [{ConfigLabel(config.Name, config.Token)}]", () => media.SetVideoEncoderConfigAsync(edited)))
       await LoadVideoConfigsAsync();
   }
 
@@ -388,9 +431,12 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     var (ok, configs) = await Runner.RunAsync("GetMetadataConfigs", media.GetMetadataConfigsAsync);
     if (!ok || configs is null) return;
 
+    _loading = true;
     MetadataConfigs.Clear();
     foreach (var config in configs) MetadataConfigs.Add(config);
     SelectedMetadataConfig = MetadataConfigs.FirstOrDefault();
+    _loading = false;
+    if (SelectedMetadataConfig is not null) await LoadMetadataOptionsAsync();
   }
 
   [RelayCommand]
@@ -457,7 +503,13 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     if (SelectedProfile is not { } profile) { Runner.Report("Select a profile first", isError: true); return; }
     if (configToken is not { Length: > 0 }) { Runner.Report("Select a configuration first", isError: true); return; }
 
-    if (await Runner.RunAsync($"{what} [{profile.Token} ← {configToken}]", () => call(media, profile.Token, configToken)))
+    if (await Runner.RunAsync($"{what} [{ProfileLabel(profile)}]", () => call(media, profile.Token, configToken)))
       await LoadMetadataConfigsAsync();
   }
+
+  private static string ProfileLabel(OnvifProfileInfo profile) =>
+    string.IsNullOrWhiteSpace(profile.Name) ? $"{profile.Width}×{profile.Height} {profile.Encoding}".Trim() : profile.Name;
+
+  private static string ConfigLabel(string name, string token) =>
+    string.IsNullOrWhiteSpace(name) ? token : name;
 }

@@ -19,6 +19,9 @@ public sealed partial class DiscoveryViewModel : TabViewModelBase
   private CancellationTokenSource? _probeCancellation;
   private CancellationTokenSource? _scanCancellation;
 
+  public override bool RequiresConnection => false;
+  public override bool IsSessionScoped => false;
+
   public DiscoveryViewModel(OperationRunner runner, UiLogger logger) : base("Discovery", runner, logger)
   {
     _logger = logger;
@@ -84,7 +87,7 @@ public sealed partial class DiscoveryViewModel : TabViewModelBase
     }
     else
     {
-      ProbeResultText = $"{result.Devices.Count} device(s) answered. Double-click one to fill in the connection bar.";
+      ProbeResultText = $"{result.Devices.Count} device(s) answered. Double-click one to add it to the device list.";
       ProbeResultIsWarning = false;
     }
   }

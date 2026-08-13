@@ -22,6 +22,7 @@ public sealed partial class AnalyticsViewModel(OperationRunner runner, UiLogger 
   public ObservableCollection<OnvifSimpleItem> SelectedItems { get; } = [];
 
   [ObservableProperty] private OnvifAnalyticsConfig? _selectedConfiguration;
+  private bool _syncing;
   [ObservableProperty] private OnvifModuleDescription? _selectedSupportedModule;
   [ObservableProperty] private OnvifModuleDescription? _selectedSupportedRule;
 
@@ -72,9 +73,32 @@ public sealed partial class AnalyticsViewModel(OperationRunner runner, UiLogger 
   /// </summary>
   public void SetConfigurations(IReadOnlyList<OnvifAnalyticsConfig> configs)
   {
+    _syncing = true;
     Configurations.Clear();
     foreach (var config in configs) Configurations.Add(config);
     SelectedConfiguration ??= Configurations.FirstOrDefault();
+    _syncing = false;
+  }
+
+  partial void OnSelectedConfigurationChanged(OnvifAnalyticsConfig? value)
+  {
+    if (_syncing || value is null || Session?.Analytics is null) return;
+    _ = ReloadSelectionAsync();
+  }
+
+  private async Task ReloadSelectionAsync()
+  {
+    await LoadModulesAsync();
+    await LoadRulesAsync();
+  }
+
+  public override async Task ActivateAsync()
+  {
+    if (!IsAvailable) return;
+    if (Configurations.Count == 0) await LoadConfigurationsAsync();
+    if (SelectedConfiguration is null) return;
+    await LoadModulesAsync();
+    await LoadRulesAsync();
   }
 
   [RelayCommand]
@@ -82,7 +106,7 @@ public sealed partial class AnalyticsViewModel(OperationRunner runner, UiLogger 
   {
     if (Session?.Media is not { } media)
     {
-      Runner.Report("The media service is what publishes analytics configuration tokens, and it is not available", isError: true);
+      Runner.Report("Analytics configurations come from the media service, which is not available", isError: true);
       return;
     }
 

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using OnvifLib.Gui.Infrastructure;
 using OnvifLib.Gui.ViewModels;
 using OnvifLib.Gui.Views;
 
@@ -11,7 +12,11 @@ public partial class App : Application
   private MainWindowViewModel? _shell;
   private bool _teardownStarted;
 
-  public override void Initialize() => AvaloniaXamlLoader.Load(this);
+  public override void Initialize()
+  {
+    AvaloniaXamlLoader.Load(this);
+    TabStripScroller.Register();
+  }
 
   public override void OnFrameworkInitializationCompleted()
   {

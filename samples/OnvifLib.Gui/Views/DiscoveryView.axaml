@@ -40,7 +40,7 @@
     <DockPanel Grid.Column="2">
       <TextBlock DockPanel.Dock="Top" Classes="section" Text="IP range scan" />
       <TextBlock DockPanel.Dock="Top" Classes="hint"
-                 Text="Tries every address × port with the user and password from the connection bar. Slower than discovery, but it works across subnets where multicast does not reach." />
+                 Text="Tries every address × port with the user and password from the device list. Slower than discovery, but it works across subnets where multicast does not reach. Use selected adds the camera to the list on the left." />
       <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,4,0,4">
         <TextBox Text="{Binding ScanFrom}" Width="130" Watermark="from" />
         <TextBox Text="{Binding ScanTo}" Width="130" Watermark="to" />

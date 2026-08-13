@@ -20,6 +20,8 @@ public static class SelfTest
     (string Name, Func<Control> Build, object DataContext)[] views =
     [
       ("MainWindow", () => new MainWindow(), shell),
+      ("DeviceListView", () => new DeviceListView(), shell.Devices),
+      ("VideoView", () => new VideoView(), shell.Video),
       ("DiscoveryView", () => new DiscoveryView(), shell.Discovery),
       ("DeviceView", () => new DeviceView(), shell.Device),
       ("MediaView", () => new MediaView(), shell.Media),

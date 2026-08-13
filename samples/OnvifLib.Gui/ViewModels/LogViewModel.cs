@@ -17,6 +17,9 @@ public sealed partial class LogViewModel : TabViewModelBase
   private readonly CancellationTokenSource _cancellation = new();
   private readonly List<LogEntry> _all = [];
 
+  public override bool RequiresConnection => false;
+  public override bool IsSessionScoped => false;
+
   public LogViewModel(OperationRunner runner, UiLogger logger) : base("Log", runner, logger)
   {
     _uiLogger = logger;

@@ -43,6 +43,12 @@ public sealed partial class DeviceIoViewModel(OperationRunner runner, UiLogger l
     EditDelayMs = value.DelayMs;
   }
 
+  partial void OnSelectedInputChanged(OnvifDigitalInput? value)
+  {
+    if (value is null || Session?.DeviceIo is null) return;
+    _ = LoadInputOptionsAsync();
+  }
+
   protected override string? DescribeUnavailability(CameraSession session) =>
     // Relays hang off Camera rather than off DeviceIOService2, so this tab is still worth opening
     // on a camera that has no Device I/O service at all.
@@ -57,6 +63,13 @@ public sealed partial class DeviceIoViewModel(OperationRunner runner, UiLogger l
     Inputs.Clear();
     LastRelayCommand = "no relay command sent yet";
     InputOptionsText = "not read";
+  }
+
+  public override async Task ActivateAsync()
+  {
+    if (Session is null) return;
+    await RefreshRelaysAsync();
+    await RefreshInputsAsync();
   }
 
   [RelayCommand]
@@ -103,7 +116,7 @@ public sealed partial class DeviceIoViewModel(OperationRunner runner, UiLogger l
 
     // Electrically this reverses; physically it may not. A relay output is usually wired to a
     // door strike, a gate or an alarm, so it asks first even though nothing is being erased.
-    if (!await dialogs.ConfirmAsync($"Switch relay {relay.Token} {(active ? "on" : "off")}",
+    if (!await dialogs.ConfirmAsync($"Switch relay {(active ? "on" : "off")}",
           "A relay output is usually wired to real hardware — a door strike, a gate, a siren.\n\n" +
           "Switching it will actuate whatever is connected."))
       return;

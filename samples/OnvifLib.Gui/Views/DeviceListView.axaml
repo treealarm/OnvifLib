@@ -1,0 +1,100 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             x:Class="OnvifLib.Gui.Views.DeviceListView"
+             x:DataType="vm:DeviceListViewModel">
+
+  <DockPanel Margin="8">
+
+    <TextBlock DockPanel.Dock="Top" Classes="section" Text="Devices" Margin="0,0,0,4" />
+
+    <StackPanel DockPanel.Dock="Top" Spacing="6">
+      <WrapPanel>
+        <Button Content="Discover" Command="{Binding DiscoverCommand}" Margin="0,0,6,4"
+                IsEnabled="{Binding !IsDiscovering}"
+                ToolTip.Tip="WS-Discovery multicast. Found cameras are added to the list — click one to connect." />
+        <Button Content="Cancel" Command="{Binding CancelDiscoverCommand}" Margin="0,0,6,4"
+                IsVisible="{Binding IsDiscovering}" />
+        <Button Content="Add" Command="{Binding AddCommand}" Margin="0,0,6,4"
+                ToolTip.Tip="Creates a device from the fields below and connects to it." />
+        <Button Content="Remove" Command="{Binding RemoveCommand}" Margin="0,0,6,4" />
+      </WrapPanel>
+
+      <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                 Text="{Binding EditorTitle}" />
+
+      <Grid ColumnDefinitions="72,*" RowDefinitions="Auto,6,Auto,6,Auto,6,Auto,6,Auto,6,Auto,6,Auto">
+        <TextBlock Grid.Row="0" Text="Name" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}" Watermark="display name"
+                 IsEnabled="{Binding HasSelection}" />
+
+        <TextBlock Grid.Row="2" Text="Address" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Ip}" Watermark="192.168.1.10" />
+
+        <TextBlock Grid.Row="4" Text="Port" VerticalAlignment="Center" Opacity="0.7" />
+        <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535"
+                       Increment="1" FormatString="0" HorizontalAlignment="Stretch"
+                       MinWidth="120" />
+
+        <TextBlock Grid.Row="6" Text="User" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding User}" Watermark="user" />
+
+        <TextBlock Grid.Row="8" Text="Password" VerticalAlignment="Center" Opacity="0.7" />
+        <DockPanel Grid.Row="8" Grid.Column="1">
+          <ToggleButton DockPanel.Dock="Right" IsChecked="{Binding RevealPassword}" Content="👁"
+                        Margin="4,0,0,0" ToolTip.Tip="Show the password" />
+          <Panel>
+            <TextBox Text="{Binding Password}" PasswordChar="•" IsVisible="{Binding !RevealPassword}" />
+            <TextBox Text="{Binding Password}" IsVisible="{Binding RevealPassword}" />
+          </Panel>
+        </DockPanel>
+
+        <TextBlock Grid.Row="10" Text="XAddr" VerticalAlignment="Center" Opacity="0.7"
+                   ToolTip.Tip="Optional ONVIF device_service URL when it is not on the usual path." />
+        <TextBox Grid.Row="10" Grid.Column="1" Text="{Binding Xaddr}" Watermark="optional service URL"
+                 Classes="mono" FontSize="12" />
+
+        <CheckBox Grid.Row="12" Grid.Column="1"
+                  IsChecked="{Binding RememberPassword}" Content="Remember password"
+                  ToolTip.Tip="Stores this device's password in clear text in settings.json. Off by default." />
+      </Grid>
+
+      <WrapPanel>
+        <Button Content="Connect" Command="{Binding ConnectCommand}" Margin="0,0,8,4"
+                ToolTip.Tip="Connect the selected camera. Clicking a camera in the list does the same." />
+        <Button Content="Disconnect" Command="{Binding DisconnectSelectedCommand}" Margin="0,0,8,4"
+                ToolTip.Tip="Stops the connection and any automatic reconnect." />
+        <Button Content="Apply" Command="{Binding ApplyCommand}" Margin="0,0,8,4"
+                ToolTip.Tip="Saves the fields into the selected camera without connecting." />
+      </WrapPanel>
+
+      <TextBlock Classes="hint" Text="{Binding ListStatus}" />
+    </StackPanel>
+
+    <ListBox x:Name="DeviceList" ItemsSource="{Binding Devices}" SelectedItem="{Binding Selected}"
+             DoubleTapped="OnDeviceDoubleTapped" SelectionChanged="OnSelectionChanged"
+             Margin="0,8,0,0">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:DeviceEntry">
+          <Grid ColumnDefinitions="96,8,*" Margin="0,2">
+            <Border Width="96" Height="54" Background="#22000000" BorderBrush="#33808080" BorderThickness="1">
+              <Panel>
+                <TextBlock Text="no preview" Opacity="0.4" FontSize="11"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNull}}" />
+                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill"
+                       IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </Panel>
+            </Border>
+            <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding AddressText}" Opacity="0.7" FontSize="12" />
+              <TextBlock Text="{Binding StateText}" FontSize="12" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+  </DockPanel>
+</UserControl>

@@ -53,29 +53,11 @@ public static class ExternalPlayer
       var executable = windows ? name + ".exe" : name;
       // Walking PATH directly rather than shelling out to `which`/`where`: spawning a process to
       // find a process is slower and drags in shell quoting for no benefit.
-      var path = SearchPath(executable) ?? (windows ? SearchWellKnownWindowsPaths(name) : null);
+      var path = ExecutableSearch.Find(executable) ?? (windows ? SearchWellKnownWindowsPaths(name) : null);
       if (path is not null) found.Add(new PlayerCandidate(name, path));
     }
 
     return found;
-  }
-
-  private static string? SearchPath(string executable)
-  {
-    var path = Environment.GetEnvironmentVariable("PATH");
-    if (string.IsNullOrEmpty(path)) return null;
-
-    foreach (var directory in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
-    {
-      try
-      {
-        var candidate = Path.Combine(directory, executable);
-        if (File.Exists(candidate)) return candidate;
-      }
-      catch (ArgumentException) { /* PATH entries with invalid characters are not worth failing over */ }
-    }
-
-    return null;
   }
 
   private static string? SearchWellKnownWindowsPaths(string name)

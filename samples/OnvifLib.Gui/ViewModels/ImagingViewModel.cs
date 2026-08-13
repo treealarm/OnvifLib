@@ -13,6 +13,7 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
   : TabViewModelBase("Imaging", runner, logger)
 {
   [ObservableProperty] private string _videoSourceToken = "";
+  [ObservableProperty] private string _sourceLabel = "no stream selected";
 
   [ObservableProperty] private double _brightness;
   [ObservableProperty] private double _contrast;
@@ -44,19 +45,43 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
 
   protected override string? DescribeUnavailability(CameraSession session) => session.Imaging is null
     ? session.Advertises(ImagingService2.GetSupportedWsdls())
-      ? "The camera advertises imaging, but the library could not create a client for it — check the Log tab."
+      ? "The camera advertises imaging, but the library could not create a client for it — see the activity below."
       : "This camera does not advertise an imaging service."
     : null;
+
+  protected override void OnConnected(CameraSession session)
+  {
+    // Do not rely on Media.ProfileSelected alone: BindSelection calls SetSession on Imaging
+    // *after* Media has already pushed the new profile, and OnCleared would wipe that token.
+    if (string.IsNullOrEmpty(VideoSourceToken))
+      SetProfile(session.Media?.GetProfiles().FirstOrDefault());
+  }
 
   protected override void OnCleared()
   {
     VideoSourceToken = "";
+    SourceLabel = "no stream selected";
     HasBrightness = HasContrast = HasSaturation = HasSharpness = false;
-    StatusText = "load the options and the settings to begin";
+    StatusText = "open this tab to read the current picture settings";
   }
 
-  /// <summary>Follows the Media tab's selection, which is where the video source token comes from.</summary>
-  public void SetProfile(OnvifProfileInfo? profile) => VideoSourceToken = profile?.VideoSourceToken ?? "";
+  /// <summary>Follows the Media tab's stream selection. The ONVIF token stays off the UI.</summary>
+  public void SetProfile(OnvifProfileInfo? profile)
+  {
+    VideoSourceToken = profile?.VideoSourceToken ?? "";
+    SourceLabel = profile is { } p
+      ? string.IsNullOrWhiteSpace(p.Name) ? $"{p.Width}×{p.Height} {p.Encoding}" : p.Name
+      : "no stream selected";
+  }
+
+  public override async Task ActivateAsync()
+  {
+    if (!IsAvailable || Session?.Imaging is null) return;
+    if (string.IsNullOrEmpty(VideoSourceToken))
+      SetProfile(Session.Media?.GetProfiles().FirstOrDefault());
+    await LoadOptionsAsync();
+    await LoadSettingsAsync();
+  }
 
   [RelayCommand]
   private async Task LoadOptionsAsync()
@@ -64,7 +89,7 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
     if (Session?.Imaging is not { } imaging) return;
     if (VideoSourceToken is not { Length: > 0 } source)
     {
-      StatusText = "the selected profile reports no VideoSourceToken, so imaging cannot be addressed";
+      StatusText = "this stream has no sensor attached — pick another on the Media tab";
       return;
     }
 
@@ -93,7 +118,12 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
   private async Task LoadSettingsAsync()
   {
     if (Session?.Imaging is not { } imaging) return;
-    if (VideoSourceToken is not { Length: > 0 } source) return;
+    if (VideoSourceToken is not { Length: > 0 } source)
+    {
+      StatusText = "this stream has no sensor attached — pick another on the Media tab";
+      Runner.Report(StatusText, isError: true);
+      return;
+    }
 
     var (ok, settings) = await Runner.RunAsync("GetImagingSettings", () => imaging.GetImagingSettingsAsync(source));
     if (!ok) return;

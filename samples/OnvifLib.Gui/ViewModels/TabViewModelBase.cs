@@ -21,23 +21,40 @@ public abstract partial class TabViewModelBase(string header, OperationRunner ru
   [ObservableProperty] private bool _isAvailable;
 
   /// <summary>Shown in place of the content when the tab is unavailable.</summary>
-  [ObservableProperty] private string _unavailableReason = "Connect to a camera first.";
+  [ObservableProperty] private string _unavailableReason = "Select a device and log in.";
+
+  /// <summary>
+  /// Discovery and Log stay usable with no session. Everything else is keyed to the selected camera.
+  /// </summary>
+  public virtual bool RequiresConnection => true;
+
+  /// <summary>
+  /// When false, switching cameras must not shut this tab down (the log pump, an in-flight probe).
+  /// </summary>
+  public virtual bool IsSessionScoped => true;
 
   public void SetSession(CameraSession? session)
   {
+    if (ReferenceEquals(Session, session)) return;
+
+    // Always drop the previous camera's lists and subscriptions before attaching the next one.
+    if (Session is not null) OnCleared();
+
     Session = session;
     if (session is null)
     {
-      IsAvailable = false;
-      UnavailableReason = "Connect to a camera first.";
-      OnCleared();
+      if (RequiresConnection)
+      {
+        IsAvailable = false;
+        UnavailableReason = "Select a device and log in.";
+      }
       return;
     }
 
     var reason = DescribeUnavailability(session);
     IsAvailable = reason is null;
     UnavailableReason = reason ?? string.Empty;
-    if (IsAvailable) OnConnected(session); else OnCleared();
+    if (IsAvailable) OnConnected(session);
   }
 
   /// <summary>Null when the tab can be used; otherwise the reason it cannot.</summary>
@@ -50,4 +67,10 @@ public abstract partial class TabViewModelBase(string header, OperationRunner ru
 
   /// <summary>Stops anything long-running before the session is discarded.</summary>
   public virtual Task ShutdownAsync() => Task.CompletedTask;
+
+  /// <summary>
+  /// Called when this tab becomes the visible one (and again after a camera bind if it already
+  /// is). Read-only queries for what the page shows belong here, not behind a Load button.
+  /// </summary>
+  public virtual Task ActivateAsync() => Task.CompletedTask;
 }

@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace OnvifLib.Gui.Infrastructure;
@@ -27,6 +29,11 @@ public sealed partial class OperationRunner(UiLogger logger) : ObservableObject
   [ObservableProperty] private bool _isBusy;
   [ObservableProperty] private string _status = "Ready";
   [ObservableProperty] private bool _statusIsError;
+
+  /// <summary>Newest last. Bound to the bottom feed so the Log tab is not required for day-to-day use.</summary>
+  public ObservableCollection<ActivityEntry> Activity { get; } = [];
+
+  private const int ActivityCap = 80;
 
   // A counter, not a flag: two tabs running at once must not have the first one to finish clear
   // the busy indicator for both.
@@ -73,6 +80,7 @@ public sealed partial class OperationRunner(UiLogger logger) : ObservableObject
   {
     Status = message;
     StatusIsError = isError;
+    Push(message, isError);
     if (isError) logger.Warning(message); else logger.Info(message);
   }
 
@@ -87,8 +95,10 @@ public sealed partial class OperationRunner(UiLogger logger) : ObservableObject
 
   private void Succeed(string what, long ms)
   {
-    Status = $"{what} — OK ({ms} ms)";
+    var text = $"{what} — OK ({ms} ms)";
+    Status = text;
     StatusIsError = false;
+    Push(text, isError: false);
     logger.Info($"✓ {what} ({ms} ms)");
   }
 
@@ -97,10 +107,24 @@ public sealed partial class OperationRunner(UiLogger logger) : ObservableObject
     var message = OnvifError.Describe(ex);
     // Cancellation is an outcome the user asked for, not a fault.
     var cancelled = ex is OperationCanceledException;
-    Status = cancelled ? $"{what} — cancelled" : $"{what} — {message}";
+    var text = cancelled ? $"{what} — cancelled" : $"{what} — {message}";
+    Status = text;
     StatusIsError = !cancelled;
+    Push(text, isError: !cancelled);
     if (cancelled) logger.Info($"· {what} cancelled");
     else logger.Error($"✗ {what}: {message}{Environment.NewLine}{ex}");
+  }
+
+  private void Push(string text, bool isError)
+  {
+    void Add()
+    {
+      Activity.Add(new ActivityEntry(DateTime.Now, text, isError));
+      while (Activity.Count > ActivityCap) Activity.RemoveAt(0);
+    }
+
+    if (Dispatcher.UIThread.CheckAccess()) Add();
+    else Dispatcher.UIThread.Post(Add);
   }
 
   private void End()

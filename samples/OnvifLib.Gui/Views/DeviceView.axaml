@@ -10,109 +10,110 @@
       <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
     </Border>
 
-    <ScrollViewer IsVisible="{Binding IsAvailable}">
-      <Grid ColumnDefinitions="*,12,1.2*">
+    <TabControl IsVisible="{Binding IsAvailable}">
 
-        <!-- Left: identity, clock, storage -->
-        <StackPanel Grid.Column="0" Spacing="4">
+      <TabItem Header="Identity">
+        <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+          <StackPanel Grid.Column="0" Spacing="6">
+            <TextBlock Classes="section" Text="Device" Margin="0" />
+            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer" Opacity="0.7" />
+              <SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Manufacturer}" />
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="Model" Opacity="0.7" />
+              <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Model}" />
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="Firmware" Opacity="0.7" />
+              <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Firmware}" />
+              <TextBlock Grid.Row="3" Grid.Column="0" Text="Serial" Opacity="0.7" />
+              <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Serial}" />
+              <TextBlock Grid.Row="4" Grid.Column="0" Text="Hardware id" Opacity="0.7" />
+              <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding HardwareId}" />
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Refresh info" Command="{Binding RefreshInfoCommand}" />
+              <Button Content="Ping" Command="{Binding PingCommand}" />
+              <TextBlock Text="{Binding AliveText}" VerticalAlignment="Center" Opacity="0.7" />
+            </StackPanel>
 
-          <TextBlock Classes="section" Text="Identity" />
-          <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="Manufacturer" Opacity="0.7" />
-            <SelectableTextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Manufacturer}" />
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="Model" Opacity="0.7" />
-            <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Model}" />
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="Firmware" Opacity="0.7" />
-            <SelectableTextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Firmware}" />
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="Serial" Opacity="0.7" />
-            <SelectableTextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Serial}" />
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Hardware id" Opacity="0.7" />
-            <SelectableTextBlock Grid.Row="4" Grid.Column="1" Text="{Binding HardwareId}" />
-          </Grid>
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-            <Button Content="Refresh info" Command="{Binding RefreshInfoCommand}" />
-            <Button Content="Ping" Command="{Binding PingCommand}" />
-            <TextBlock Text="{Binding AliveText}" VerticalAlignment="Center" Opacity="0.7" />
+            <TextBlock Classes="section" Text="Capabilities" />
+            <WrapPanel>
+              <CheckBox Content="PTZ" IsChecked="{Binding HasPtz}" IsHitTestVisible="False" Margin="0,0,12,0" />
+              <CheckBox Content="Imaging" IsChecked="{Binding HasImaging}" IsHitTestVisible="False" Margin="0,0,12,0" />
+              <CheckBox Content="Events" IsChecked="{Binding HasEvents}" IsHitTestVisible="False" Margin="0,0,12,0" />
+              <CheckBox Content="Digital inputs" IsChecked="{Binding HasDigitalInputs}" IsHitTestVisible="False" Margin="0,0,12,0" />
+              <CheckBox Content="Edge recording" IsChecked="{Binding HasEdgeRecording}" IsHitTestVisible="False" Margin="0,0,12,0" />
+              <CheckBox Content="Analytics" IsChecked="{Binding HasAnalytics}" IsHitTestVisible="False" />
+            </WrapPanel>
+
+            <TextBlock Classes="section" Text="Clock" />
+            <SelectableTextBlock Text="{Binding ClockText}" TextWrapping="Wrap" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Read device time" Command="{Binding ReadDeviceTimeCommand}" />
+              <Button Content="Measure offset" Command="{Binding MeasureClockCommand}" />
+            </StackPanel>
           </StackPanel>
 
-          <TextBlock Classes="section" Text="Capabilities" />
-          <TextBlock Classes="hint"
-                     Text="What Camera.GetCapabilitiesSummaryAsync() reported at connect. PTZ costs a GetConfigurations round trip because advertising the PTZ WSDL does not mean there is a motor behind it." />
-          <WrapPanel>
-            <CheckBox Content="PTZ" IsChecked="{Binding HasPtz}" IsHitTestVisible="False" Margin="0,0,12,0" />
-            <CheckBox Content="Imaging" IsChecked="{Binding HasImaging}" IsHitTestVisible="False" Margin="0,0,12,0" />
-            <CheckBox Content="Events" IsChecked="{Binding HasEvents}" IsHitTestVisible="False" Margin="0,0,12,0" />
-            <CheckBox Content="Digital inputs" IsChecked="{Binding HasDigitalInputs}" IsHitTestVisible="False" Margin="0,0,12,0" />
-            <CheckBox Content="Edge recording" IsChecked="{Binding HasEdgeRecording}" IsHitTestVisible="False" Margin="0,0,12,0" />
-            <CheckBox Content="Analytics" IsChecked="{Binding HasAnalytics}" IsHitTestVisible="False" />
-          </WrapPanel>
+          <DockPanel Grid.Column="2">
+            <TextBlock DockPanel.Dock="Top" Classes="section" Text="Services" Margin="0,0,0,4" />
+            <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshServicesCommand}"
+                    HorizontalAlignment="Left" Margin="0,0,0,4" />
+            <DataGrid ItemsSource="{Binding Services}" IsReadOnly="True" GridLinesVisibility="Horizontal"
+                      CanUserResizeColumns="True">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="WSDL namespace" Binding="{Binding Namespace}" Width="*" />
+                <DataGridTextColumn Header="XAddr" Binding="{Binding XAddr}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </Grid>
+      </TabItem>
 
-          <TextBlock Classes="section" Text="Clock" />
-          <TextBlock Classes="hint"
-                     Text="The camera's own archive is indexed in the camera's clock. Every Profile G timestamp is converted through this offset." />
-          <SelectableTextBlock Text="{Binding ClockText}" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-            <Button Content="Read device time" Command="{Binding ReadDeviceTimeCommand}" />
-            <Button Content="Measure offset" Command="{Binding MeasureClockCommand}" />
+      <TabItem Header="Storage &amp; admin">
+        <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Storage" Margin="0" />
+              <SelectableTextBlock Text="{Binding StorageSupportText}" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Read support" Command="{Binding ReadStorageSupportCommand}" />
+                <Button Content="Read configurations" Command="{Binding ReadStorageConfigurationsCommand}" />
+              </StackPanel>
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding StorageConfigurations}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Token}" Width="Auto" />
+                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="Auto" />
+                <DataGridTextColumn Header="Local path" Binding="{Binding LocalPath}" Width="*" />
+                <DataGridTextColumn Header="Storage URI" Binding="{Binding StorageUri}" Width="*" />
+                <DataGridTextColumn Header="User" Binding="{Binding User}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Classes="section" Text="Destructive operations" Margin="0" />
+            <TextBlock Classes="hint" Text="Each action asks for confirmation first." />
+            <WrapPanel>
+              <Button Content="Sync clock to this machine" Command="{Binding SyncTimeCommand}" Margin="0,0,8,4" />
+              <Button Content="Reboot" Command="{Binding RebootCommand}" Margin="0,0,8,4" />
+            </WrapPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <DatePicker SelectedDate="{Binding ManualDate}" />
+              <TimePicker SelectedTime="{Binding ManualTime}" />
+              <Button Content="Set clock" Command="{Binding SetTimeCommand}" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <ComboBox ItemsSource="{Binding AuxiliaryCommands}" SelectedItem="{Binding SelectedAuxiliaryCommand}"
+                        Width="240" PlaceholderText="auxiliary command…" />
+              <Button Content="Send" Command="{Binding SendAuxiliaryCommandCommand}" />
+            </StackPanel>
+            <TextBlock Classes="hint"
+                       Text="ONVIF does not define what auxiliary commands do. On many cameras one of them formats the SD card." />
+            <SelectableTextBlock Text="{Binding AuxiliaryResponse}" Classes="mono" TextWrapping="Wrap" />
           </StackPanel>
+        </Grid>
+      </TabItem>
 
-          <TextBlock Classes="section" Text="Storage" />
-          <SelectableTextBlock Text="{Binding StorageSupportText}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Read support" Command="{Binding ReadStorageSupportCommand}" />
-            <Button Content="Read configurations" Command="{Binding ReadStorageConfigurationsCommand}" />
-          </StackPanel>
-          <DataGrid ItemsSource="{Binding StorageConfigurations}" IsReadOnly="True" Height="120"
-                    GridLinesVisibility="Horizontal" Margin="0,4,0,0">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="Auto" />
-              <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="Auto" />
-              <DataGridTextColumn Header="Local path" Binding="{Binding LocalPath}" Width="*" />
-              <DataGridTextColumn Header="Storage URI" Binding="{Binding StorageUri}" Width="*" />
-              <DataGridTextColumn Header="User" Binding="{Binding User}" Width="Auto" />
-            </DataGrid.Columns>
-          </DataGrid>
-
-          <TextBlock Classes="section" Text="Destructive operations" />
-          <TextBlock Classes="hint"
-                     Text="Each of these asks for confirmation. The console probe never runs any of them — this is the only place they can be exercised." />
-          <WrapPanel>
-            <Button Content="Sync clock to this machine" Command="{Binding SyncTimeCommand}" Margin="0,0,8,4" />
-            <Button Content="Reboot" Command="{Binding RebootCommand}" Margin="0,0,8,4" />
-          </WrapPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <DatePicker SelectedDate="{Binding ManualDate}" />
-            <TimePicker SelectedTime="{Binding ManualTime}" />
-            <Button Content="Set clock" Command="{Binding SetTimeCommand}" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-            <ComboBox ItemsSource="{Binding AuxiliaryCommands}" SelectedItem="{Binding SelectedAuxiliaryCommand}"
-                      Width="240" PlaceholderText="auxiliary command…" />
-            <Button Content="Send" Command="{Binding SendAuxiliaryCommandCommand}" />
-          </StackPanel>
-          <TextBlock Classes="hint"
-                     Text="ONVIF defines the transport for auxiliary commands but not what they do. On many cameras one of them formats the SD card." />
-          <SelectableTextBlock Text="{Binding AuxiliaryResponse}" Classes="mono" TextWrapping="Wrap" />
-
-        </StackPanel>
-
-        <!-- Right: the service table, which explains every "service not available" elsewhere -->
-        <DockPanel Grid.Column="2">
-          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Services the camera advertises" />
-          <TextBlock DockPanel.Dock="Top" Classes="hint"
-                     Text="From Device.GetServices. When a tab says a service is unavailable, this is where to check whether the camera never offered it or the library could not build a client for it." />
-          <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshServicesCommand}"
-                  HorizontalAlignment="Left" Margin="0,4,0,4" />
-          <DataGrid ItemsSource="{Binding Services}" IsReadOnly="True" GridLinesVisibility="Horizontal"
-                    CanUserResizeColumns="True">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="WSDL namespace" Binding="{Binding Namespace}" Width="*" />
-              <DataGridTextColumn Header="XAddr" Binding="{Binding XAddr}" Width="*" />
-            </DataGrid.Columns>
-          </DataGrid>
-        </DockPanel>
-
-      </Grid>
-    </ScrollViewer>
+    </TabControl>
   </Panel>
 </UserControl>

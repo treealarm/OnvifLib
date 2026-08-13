@@ -14,6 +14,9 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
   // generated command blocks re-entry while it runs, which would swallow the release.
   private bool _moving;
 
+  /// <summary>The shared in-window player, created by the shell.</summary>
+  public VideoPlayerViewModel? Video { get; set; }
+
   public ObservableCollection<PtzPresetDto> Presets { get; } = [];
 
   [ObservableProperty]
@@ -45,7 +48,9 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
   [ObservableProperty] private double _absoluteTilt;
   [ObservableProperty] private double _absoluteZoom;
 
-  public string ProfileText => Profile is { } p ? $"{p.Token} ({p.Name})" : "no profile selected — pick one on the Media tab";
+  public string ProfileText => Profile is { } p
+    ? string.IsNullOrWhiteSpace(p.Name) ? $"{p.Width}×{p.Height} {p.Encoding}" : p.Name
+    : "no stream selected — pick one on the Media tab";
 
   protected override string? DescribeUnavailability(CameraSession session) => session.Ptz is null
     ? session.Advertises(PtzService2.GetSupportedWsdls())
@@ -67,9 +72,14 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
         : "The camera reported no media profiles, so there is nothing to address PTZ against."
       : "";
 
-    // Read the capabilities straight away rather than waiting for a click: the checkboxes are the
-    // answer to "why does it not move", and they are worthless while they are blank.
-    _ = LoadCapabilitiesAsync();
+  }
+
+  public override async Task ActivateAsync()
+  {
+    if (!IsAvailable || Session?.Ptz is null) return;
+    Profile ??= Session.Media?.GetProfiles().FirstOrDefault();
+    await LoadCapabilitiesAsync();
+    await LoadPresetsAsync();
   }
 
   protected override void OnCleared()
@@ -225,11 +235,11 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
     // overwrites that preset with the current position instead.
     var token = SelectedPreset?.Token ?? string.Empty;
 
-    var (ok, created) = await Runner.RunAsync($"SetPreset '{name}'",
+    var (ok, _) = await Runner.RunAsync($"SetPreset '{name}'",
       () => ptz.SetPresetAsync(profileToken, name, token));
     if (!ok) return;
 
-    Runner.Report($"SetPreset — the camera assigned token {created}");
+    Runner.Report($"Preset '{name}' saved");
     await LoadPresetsAsync();
   }
 

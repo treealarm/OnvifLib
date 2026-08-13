@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             xmlns:views="using:OnvifLib.Gui.Views"
              x:Class="OnvifLib.Gui.Views.MediaView"
              x:DataType="vm:MediaViewModel">
 
@@ -10,177 +11,191 @@
       <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
     </Border>
 
-    <Grid IsVisible="{Binding IsAvailable}" ColumnDefinitions="1.1*,8,1.4*,8,1.3*">
+    <TabControl IsVisible="{Binding IsAvailable}">
 
-      <!-- Profiles and streaming -->
-      <DockPanel Grid.Column="0">
-        <TextBlock DockPanel.Dock="Top" Classes="section" Text="Profiles" />
-        <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshProfilesCommand}"
-                HorizontalAlignment="Left" Margin="0,0,0,4" />
+      <TabItem Header="Streams">
+        <Grid ColumnDefinitions="*,8,1.2*" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Profiles" VerticalAlignment="Center" Margin="0" />
+              <Button Content="Refresh" Command="{Binding RefreshProfilesCommand}" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+              <TextBlock Classes="section" Text="Stream URI" Margin="0,0,0,0" />
+              <Button Content="Get stream URI" Command="{Binding GetStreamUriCommand}"
+                      IsEnabled="{Binding HasProfile}" HorizontalAlignment="Left" />
+              <TextBox Text="{Binding StreamUri, Mode=OneWay}" IsReadOnly="True" Classes="mono"
+                       TextWrapping="Wrap" MaxHeight="56" />
+              <SelectableTextBlock Text="{Binding MaskedStreamUri}" Classes="mono" TextWrapping="Wrap" MaxLines="2" />
+              <WrapPanel>
+                <Button Content="Copy URI" Click="OnCopyStreamUri" Margin="0,0,8,4"
+                        ToolTip.Tip="Copies the real URI, with the password in clear text." />
+                <Button Content="Play externally" Command="{Binding PlayStreamCommand}" Margin="0,0,8,4" />
+                <ComboBox ItemsSource="{Binding Players}" SelectedItem="{Binding SelectedPlayer}"
+                          Width="160" Margin="0,0,8,4" PlaceholderText="no player found" />
+              </WrapPanel>
+              <TextBox Text="{Binding CustomPlayerPath}" Watermark="…or a player executable path" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
+                      IsReadOnly="True" GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="W" Binding="{Binding Width}" Width="Auto" />
+                <DataGridTextColumn Header="H" Binding="{Binding Height}" Width="Auto" />
+                <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
 
-        <StackPanel DockPanel.Dock="Bottom" Spacing="4">
-          <TextBlock Classes="section" Text="Stream" />
-          <Button Content="Get stream URI" Command="{Binding GetStreamUriCommand}"
-                  IsEnabled="{Binding HasProfile}" HorizontalAlignment="Left" />
-          <TextBox Text="{Binding StreamUri, Mode=OneWay}" IsReadOnly="True" Classes="mono"
-                   TextWrapping="Wrap" MaxHeight="70"
-                   ToolTip.Tip="Exactly as the camera reported it — without credentials, which is why a player needs them spliced in." />
-          <TextBlock Classes="hint" Text="With credentials (password hidden):" />
-          <SelectableTextBlock Text="{Binding MaskedStreamUri}" Classes="mono" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Copy URI" Click="OnCopyStreamUri"
-                    ToolTip.Tip="Copies the real URI, with the password in clear text." />
-            <Button Content="Play" Command="{Binding PlayStreamCommand}" />
-            <ComboBox ItemsSource="{Binding Players}" SelectedItem="{Binding SelectedPlayer}"
-                      Width="180" PlaceholderText="no player found" />
+          <Border Grid.Column="2" BorderBrush="#33808080" BorderThickness="1">
+            <views:VideoView DataContext="{Binding Video}" />
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="Snapshot">
+        <DockPanel Margin="0,4,0,0">
+          <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,4">
+            <TextBlock Classes="hint"
+                       Text="Snapshot uses the camera's first profile. Paste another JPEG URL below if needed." />
+            <WrapPanel>
+              <Button Content="Snapshot" Command="{Binding SnapshotCommand}" Margin="0,0,8,4" />
+              <ToggleButton Content="Live" IsChecked="{Binding IsLive}" Command="{Binding ToggleLiveCommand}"
+                            Margin="0,0,8,4" />
+              <NumericUpDown Value="{Binding SnapshotIntervalMs}" Minimum="100" Maximum="10000"
+                             Increment="100" FormatString="0" Width="120" Margin="0,0,8,4" />
+              <Button Content="Save…" Click="OnSaveSnapshot" Margin="0,0,8,4" />
+            </WrapPanel>
           </StackPanel>
-          <TextBox Text="{Binding CustomPlayerPath}" Watermark="…or a player executable path" />
-          <TextBlock Classes="hint"
-                     Text="The password is passed to the player on its command line, so it is visible in ps/Task Manager. Neither VLC nor ffplay offers a way around that." />
-        </StackPanel>
-
-        <DataGrid ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
-                  IsReadOnly="True" GridLinesVisibility="Horizontal" MinHeight="120">
-          <DataGrid.Columns>
-            <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="Auto" />
-            <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-            <DataGridTextColumn Header="W" Binding="{Binding Width}" Width="Auto" />
-            <DataGridTextColumn Header="H" Binding="{Binding Height}" Width="Auto" />
-            <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
-            <DataGridTextColumn Header="Video source" Binding="{Binding VideoSourceToken}" Width="Auto" />
-          </DataGrid.Columns>
-        </DataGrid>
-      </DockPanel>
-
-      <!-- Snapshot -->
-      <DockPanel Grid.Column="2">
-        <TextBlock DockPanel.Dock="Top" Classes="section" Text="Snapshot" />
-        <TextBlock DockPanel.Dock="Top" Classes="hint"
-                   Text="MediaService.GetImage() takes no profile token — the library always resolves the snapshot URI for the FIRST profile. Use the URL box below to fetch any other one." />
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,4,0,4">
-          <Button Content="Snapshot" Command="{Binding SnapshotCommand}" />
-          <ToggleButton Content="Live" IsChecked="{Binding IsLive}" Command="{Binding ToggleLiveCommand}" />
-          <NumericUpDown Value="{Binding SnapshotIntervalMs}" Minimum="100" Maximum="10000"
-                         Increment="100" FormatString="0" Width="120"
-                         ToolTip.Tip="Poll interval in milliseconds. Requests never overlap: a slow camera just answers less often." />
-          <Button Content="Save…" Click="OnSaveSnapshot" />
-        </StackPanel>
-        <TextBlock DockPanel.Dock="Bottom" Classes="hint" Text="{Binding SnapshotInfo}" />
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-          <TextBox Text="{Binding ManualSnapshotUrl}" Watermark="snapshot URL to fetch directly" Width="280" />
-          <Button Content="Download" Command="{Binding DownloadSnapshotCommand}" />
-        </StackPanel>
-
-        <Border BorderBrush="#33808080" BorderThickness="1">
-          <Image Source="{Binding Frame}" Stretch="Uniform" />
-        </Border>
-      </DockPanel>
-
-      <!-- Encoders and Profile M -->
-      <ScrollViewer Grid.Column="4">
-        <StackPanel Spacing="4">
-
-          <TextBlock Classes="section" Text="Video encoder" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Load configs" Command="{Binding LoadVideoConfigsCommand}" />
-            <Button Content="Load options" Command="{Binding LoadVideoOptionsCommand}" />
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+            <TextBox Text="{Binding ManualSnapshotUrl}" Watermark="snapshot URL to fetch directly" Width="360" />
+            <Button Content="Download" Command="{Binding DownloadSnapshotCommand}" />
+            <TextBlock Text="{Binding SnapshotInfo}" Classes="hint" VerticalAlignment="Center" />
           </StackPanel>
-          <DataGrid ItemsSource="{Binding VideoConfigs}" SelectedItem="{Binding SelectedVideoConfig}"
-                    IsReadOnly="True" Height="110" GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-              <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
-              <DataGridTextColumn Header="W" Binding="{Binding Width}" Width="Auto" />
-              <DataGridTextColumn Header="H" Binding="{Binding Height}" Width="Auto" />
-              <DataGridTextColumn Header="fps" Binding="{Binding FrameRateLimit}" Width="Auto" />
-              <DataGridTextColumn Header="kbps" Binding="{Binding BitrateLimit}" Width="Auto" />
-              <DataGridTextColumn Header="GOV" Binding="{Binding GovLength}" Width="Auto" />
-            </DataGrid.Columns>
-          </DataGrid>
-          <DataGrid ItemsSource="{Binding VideoOptions}" IsReadOnly="True" Height="80"
-                    GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
-              <DataGridTextColumn Header="fps" Binding="{Binding MinFrameRate, StringFormat='from {0}'}" Width="Auto" />
-              <DataGridTextColumn Header="max fps" Binding="{Binding MaxFrameRate}" Width="Auto" />
-              <DataGridTextColumn Header="min kbps" Binding="{Binding MinBitrate}" Width="Auto" />
-              <DataGridTextColumn Header="max kbps" Binding="{Binding MaxBitrate}" Width="Auto" />
-            </DataGrid.Columns>
-          </DataGrid>
-          <WrapPanel>
-            <NumericUpDown Value="{Binding EditWidth}" FormatString="0" Width="110" Margin="0,0,4,4" />
-            <NumericUpDown Value="{Binding EditHeight}" FormatString="0" Width="110" Margin="0,0,4,4" />
-            <NumericUpDown Value="{Binding EditFrameRate}" FormatString="0" Width="100" Margin="0,0,4,4" />
-            <NumericUpDown Value="{Binding EditBitrate}" FormatString="0" Width="110" Margin="0,0,4,4" />
-            <NumericUpDown Value="{Binding EditGovLength}" FormatString="0" Width="100" Margin="0,0,4,4" />
-            <Button Content="Apply" Command="{Binding ApplyVideoConfigCommand}" />
-          </WrapPanel>
-          <TextBlock Classes="hint" Text="Width, height, fps, bitrate, GOV. The options grid above is what the camera says it accepts." />
+          <Border BorderBrush="#33808080" BorderThickness="1">
+            <Image Source="{Binding Frame}" Stretch="Uniform" />
+          </Border>
+        </DockPanel>
+      </TabItem>
 
-          <TextBlock Classes="section" Text="Audio encoder" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Load configs" Command="{Binding LoadAudioConfigsCommand}" />
-            <Button Content="Load options" Command="{Binding LoadAudioOptionsCommand}" />
-          </StackPanel>
-          <DataGrid ItemsSource="{Binding AudioConfigs}" SelectedItem="{Binding SelectedAudioConfig}"
-                    IsReadOnly="True" Height="80" GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-              <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
-              <DataGridTextColumn Header="kbps" Binding="{Binding Bitrate}" Width="Auto" />
-              <DataGridTextColumn Header="Hz" Binding="{Binding SampleRate}" Width="Auto" />
-            </DataGrid.Columns>
-          </DataGrid>
+      <TabItem Header="Encoders">
+        <Grid ColumnDefinitions="*,8,*" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Video" VerticalAlignment="Center" Margin="0" />
+              <Button Content="Load configs" Command="{Binding LoadVideoConfigsCommand}" />
+              <Button Content="Load options" Command="{Binding LoadVideoOptionsCommand}" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+              <WrapPanel>
+                <NumericUpDown Value="{Binding EditWidth}" FormatString="0" Width="100" Margin="0,0,4,4" />
+                <NumericUpDown Value="{Binding EditHeight}" FormatString="0" Width="100" Margin="0,0,4,4" />
+                <NumericUpDown Value="{Binding EditFrameRate}" FormatString="0" Width="90" Margin="0,0,4,4" />
+                <NumericUpDown Value="{Binding EditBitrate}" FormatString="0" Width="100" Margin="0,0,4,4" />
+                <NumericUpDown Value="{Binding EditGovLength}" FormatString="0" Width="90" Margin="0,0,4,4" />
+                <Button Content="Apply" Command="{Binding ApplyVideoConfigCommand}" />
+              </WrapPanel>
+              <TextBlock Classes="hint" Text="Width, height, fps, bitrate, GOV." />
+            </StackPanel>
+            <Grid RowDefinitions="*,4,*">
+              <DataGrid Grid.Row="0" ItemsSource="{Binding VideoConfigs}" SelectedItem="{Binding SelectedVideoConfig}"
+                        IsReadOnly="True" GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                  <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
+                  <DataGridTextColumn Header="W" Binding="{Binding Width}" Width="Auto" />
+                  <DataGridTextColumn Header="H" Binding="{Binding Height}" Width="Auto" />
+                  <DataGridTextColumn Header="fps" Binding="{Binding FrameRateLimit}" Width="Auto" />
+                  <DataGridTextColumn Header="kbps" Binding="{Binding BitrateLimit}" Width="Auto" />
+                  <DataGridTextColumn Header="GOV" Binding="{Binding GovLength}" Width="Auto" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <DataGrid Grid.Row="2" ItemsSource="{Binding VideoOptions}" IsReadOnly="True"
+                        GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
+                  <DataGridTextColumn Header="fps" Binding="{Binding MinFrameRate, StringFormat='from {0}'}" Width="Auto" />
+                  <DataGridTextColumn Header="max fps" Binding="{Binding MaxFrameRate}" Width="Auto" />
+                  <DataGridTextColumn Header="min kbps" Binding="{Binding MinBitrate}" Width="Auto" />
+                  <DataGridTextColumn Header="max kbps" Binding="{Binding MaxBitrate}" Width="Auto" />
+                </DataGrid.Columns>
+              </DataGrid>
+            </Grid>
+          </DockPanel>
 
-          <TextBlock Classes="section" Text="Profile M — metadata" />
-          <TextBlock Classes="hint"
-                     Text="The Analytics flag is what decides whether the metadata track carries object boxes. A configuration with it set but attached to no profile changes nothing: the track only appears in a stream pulled from a profile that carries the configuration." />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Load metadata" Command="{Binding LoadMetadataConfigsCommand}" />
-            <Button Content="Options" Command="{Binding LoadMetadataOptionsCommand}" />
-          </StackPanel>
-          <DataGrid ItemsSource="{Binding MetadataConfigs}" SelectedItem="{Binding SelectedMetadataConfig}"
-                    IsReadOnly="True" Height="90" GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-              <DataGridCheckBoxColumn Header="Analytics" Binding="{Binding Analytics}" Width="Auto" />
-              <DataGridCheckBoxColumn Header="PTZ" Binding="{Binding PtzStatus}" Width="Auto" />
-              <DataGridCheckBoxColumn Header="Events" Binding="{Binding Events}" Width="Auto" />
-              <DataGridTextColumn Header="Profiles" Binding="{Binding AttachedProfileTokens.Count}" Width="Auto" />
-            </DataGrid.Columns>
-          </DataGrid>
-          <TextBlock Classes="hint" Text="{Binding MetadataOptionsText}" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <CheckBox Content="Analytics" IsChecked="{Binding EditAnalytics}" IsThreeState="True"
-                      ToolTip.Tip="Indeterminate means leave unchanged." />
-            <CheckBox Content="PTZ status" IsChecked="{Binding EditPtzStatus}" IsThreeState="True"
-                      ToolTip.Tip="Indeterminate means leave unchanged." />
-            <Button Content="Apply" Command="{Binding ApplyMetadataConfigCommand}" />
-          </StackPanel>
+          <DockPanel Grid.Column="2">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Audio" VerticalAlignment="Center" Margin="0" />
+              <Button Content="Load configs" Command="{Binding LoadAudioConfigsCommand}" />
+              <Button Content="Load options" Command="{Binding LoadAudioOptionsCommand}" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding AudioConfigs}" SelectedItem="{Binding SelectedAudioConfig}"
+                      IsReadOnly="True" GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Codec" Binding="{Binding Encoding}" Width="Auto" />
+                <DataGridTextColumn Header="kbps" Binding="{Binding Bitrate}" Width="Auto" />
+                <DataGridTextColumn Header="Hz" Binding="{Binding SampleRate}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </Grid>
+      </TabItem>
 
-          <TextBlock Classes="section" Text="Profile M — analytics configurations" />
-          <Button Content="Load" Command="{Binding LoadAnalyticsConfigsCommand}" HorizontalAlignment="Left" />
-          <TextBlock Classes="hint" Text="These tokens are what the Analytics tab works from — load them here first." />
-          <DataGrid ItemsSource="{Binding AnalyticsConfigs}" SelectedItem="{Binding SelectedAnalyticsConfig}"
-                    IsReadOnly="True" Height="80" GridLinesVisibility="Horizontal">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="Auto" />
-              <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-              <DataGridTextColumn Header="Profiles" Binding="{Binding AttachedProfileTokens.Count}" Width="Auto" />
-            </DataGrid.Columns>
-          </DataGrid>
-          <WrapPanel>
-            <Button Content="Attach metadata" Command="{Binding AttachMetadataCommand}" Margin="0,0,4,4" />
-            <Button Content="Detach metadata" Command="{Binding DetachMetadataCommand}" Margin="0,0,4,4" />
-            <Button Content="Attach analytics" Command="{Binding AttachAnalyticsCommand}" Margin="0,0,4,4" />
-            <Button Content="Detach analytics" Command="{Binding DetachAnalyticsCommand}" Margin="0,0,4,4" />
-          </WrapPanel>
-          <TextBlock Classes="hint"
-                     Text="Attach and detach change which configurations the selected profile carries. The console probe refuses to run them because the revert is not reliably clean." />
+      <TabItem Header="Profile M">
+        <Grid ColumnDefinitions="*,8,*" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,4">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="section" Text="Metadata" VerticalAlignment="Center" Margin="0" />
+                <Button Content="Load" Command="{Binding LoadMetadataConfigsCommand}" />
+                <Button Content="Options" Command="{Binding LoadMetadataOptionsCommand}" />
+              </StackPanel>
+              <TextBlock Classes="hint" Text="{Binding MetadataOptionsText}" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <CheckBox Content="Analytics" IsChecked="{Binding EditAnalytics}" IsThreeState="True" />
+                <CheckBox Content="PTZ status" IsChecked="{Binding EditPtzStatus}" IsThreeState="True" />
+                <Button Content="Apply" Command="{Binding ApplyMetadataConfigCommand}" />
+              </StackPanel>
+              <WrapPanel>
+                <Button Content="Attach to profile" Command="{Binding AttachMetadataCommand}" Margin="0,0,8,4" />
+                <Button Content="Detach" Command="{Binding DetachMetadataCommand}" Margin="0,0,8,4" />
+              </WrapPanel>
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding MetadataConfigs}" SelectedItem="{Binding SelectedMetadataConfig}"
+                      IsReadOnly="True" GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridCheckBoxColumn Header="Analytics" Binding="{Binding Analytics}" Width="Auto" />
+                <DataGridCheckBoxColumn Header="PTZ" Binding="{Binding PtzStatus}" Width="Auto" />
+                <DataGridCheckBoxColumn Header="Events" Binding="{Binding Events}" Width="Auto" />
+                <DataGridTextColumn Header="Profiles" Binding="{Binding AttachedProfileTokens.Count}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
 
-        </StackPanel>
-      </ScrollViewer>
+          <DockPanel Grid.Column="2">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Analytics configs" VerticalAlignment="Center" Margin="0" />
+              <Button Content="Load" Command="{Binding LoadAnalyticsConfigsCommand}" />
+            </StackPanel>
+            <WrapPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+              <Button Content="Attach to profile" Command="{Binding AttachAnalyticsCommand}" Margin="0,0,8,4" />
+              <Button Content="Detach" Command="{Binding DetachAnalyticsCommand}" Margin="0,0,8,4" />
+            </WrapPanel>
+            <DataGrid ItemsSource="{Binding AnalyticsConfigs}" SelectedItem="{Binding SelectedAnalyticsConfig}"
+                      IsReadOnly="True" GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Profiles" Binding="{Binding AttachedProfileTokens.Count}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </Grid>
+      </TabItem>
 
-    </Grid>
+    </TabControl>
   </Panel>
 </UserControl>

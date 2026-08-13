@@ -1,12 +1,15 @@
 # OnvifLib.Gui
 
-A desktop test bench for [OnvifLib](../../README.md), built with [Avalonia](https://avaloniaui.net/)
-so the same code runs on Windows and Linux. Ten tabs, one per service, with a button for every
-public call the library exposes.
+A desktop ONVIF device manager and test bench for [OnvifLib](../../README.md), built with
+[Avalonia](https://avaloniaui.net/) so the same code runs on Windows and Linux. The layout follows
+ONVIF Device Manager: a list of cameras on the left, live video and the service tabs on the right.
 
 Where [OnvifLib.Probe](../OnvifLib.Probe/README.md) answers "does this camera work" in one
 non-interactive run, this answers "what does this camera do when I poke it" — including the
 destructive operations the probe refuses to touch.
+
+The **library** is still control-plane only (SOAP, RTSP URIs, JPEG snapshots). This sample is what
+decodes video, and only here.
 
 ## Running it
 
@@ -14,10 +17,15 @@ destructive operations the probe refuses to touch.
 dotnet run --project samples/OnvifLib.Gui
 ```
 
-Fill in the address, port, user and password at the top, press **Connect**, and the tabs light up.
-The connection bar is written back to `settings.json` under your config directory after a
-successful connect and at exit, so the next run starts filled in. The password is only stored if
-you tick **Remember** — and then in clear text, which is why it is off by default and labelled.
+**Discover** (left pane) runs WS-Discovery and fills the device list. **Add** takes an address and
+port typed above the list. Selecting a camera connects it; **Connect** does the same for the
+already-selected row. Several cameras can stay connected; the tabs and the live player always
+follow the **selected** row.
+
+The list, the last address, and video preferences are written back to `settings.json` under your
+config directory after a successful login and at exit. A password is only stored if you tick
+**Remember** on that device — and then in clear text, which is why it is off by default and labelled.
+
 A tab the camera cannot support still opens and says so, rather than disappearing — that answer is
 usually the point of the exercise.
 
@@ -26,60 +34,69 @@ usually the point of the exercise.
 dotnet run --project samples/OnvifLib.Gui -- --selftest
 ```
 
-## The tabs
+## The panes
 
 | | |
 |---|---|
-| **Discovery** | WS-Discovery multicast, plus a brute-force IP sweep. Works with no session — the place to start when a connection is failing. Double-click a result to fill in the connection bar. |
-| **Device** | Identity, the service table, the clock offset, camera storage, and the destructive operations (reboot, set clock, vendor auxiliary commands), each behind a confirmation. |
-| **Media** | Profiles, stream URIs, snapshots (single and polled), video and audio encoder configuration, and the Profile M metadata plumbing. |
-| **PTZ** | A press-and-hold direction pad, relative and absolute movement, and presets. |
+| **Device list** | Cameras you have discovered or added. JPEG thumbnails refresh for connected devices. Click a row to connect. |
+| **Live** | In-window RTSP playback of the selected camera (ffmpeg → BGRA). The same player is embedded on Media and PTZ. |
+| **Device** | Identity, capabilities, clock, services; storage and destructive ops on a second sub-tab. |
+| **Media** | Sub-tabs: Streams, Snapshot, Encoders, Profile M — each fits without page scrolling. |
+| **PTZ** | A press-and-hold direction pad, relative and absolute movement, presets, and the live picture so you are not moving the head blind. |
 | **Imaging** | Brightness, contrast, saturation and sharpness, with the ranges the camera reports. |
 | **Events** | The pull-point subscription, the raw notifications it produces, and a panel for `Camera.ParseEvent`. |
-| **Analytics** | Modules and rules, their parameters, and the raw XML three of the calls return by design. |
-| **Profile G** | The camera's own recordings: configuration, jobs, search, and replay. |
+| **Analytics** | Modules, rules, and parameters on separate sub-tabs. |
+| **Profile G** | Sub-tabs: On camera (recordings/jobs) and Search & archive (search + archive player). |
 | **Device I/O** | Relay outputs and digital inputs. |
+| **Discovery** | WS-Discovery again, plus a brute-force IP sweep for networks where multicast does not reach. Double-click a result to add it to the list. |
 | **Log** | Everything the library logged, optionally including the full SOAP exchange. **The first place to look when anything above fails.** |
 
 ## Video
 
-The library is control-plane only: it hands out URIs and JPEG snapshots and decodes nothing. So
-this app shows video two ways, neither of which needs a native media dependency:
+Live video is decoded **inside the window**. The sample starts `ffmpeg`, reads raw BGRA frames from
+its stdout, and paints them on a reused `WriteableBitmap`. One stream at a time — the selected
+camera — defaulting to the **substream** (smallest profile) at 640×360 / 12 fps, because a 1440p
+HEVC main stream is expensive to decode into raw frames.
 
-- **Snapshots**, polled on a timer into an `Image`. Requests never overlap, so a slow camera simply
-  answers less often instead of piling up. Note that `MediaService.GetImage()` takes no profile
-  token — the library always fetches the *first* profile's snapshot. The URL box next to it calls
-  the public `MediaService.DownloadImageAsync` so any other snapshot URI can still be fetched.
-- **An external player.** The app finds `vlc`, `ffplay` or `mpv` on `PATH` (plus VLC's standard
-  install locations on Windows), splices the credentials into the RTSP URI, and launches it.
-  There is a box for a player path if yours is somewhere unusual, and a drop-down to pick between
-  the ones that were found.
+ffmpeg is located in this order:
 
-  The default differs by platform for an empirical reason: **the VLC packaged for current Debian
-  and Ubuntu no longer ships the live555 demuxer**, so it cannot open a plain RTSP stream at all —
-  it falls back to the satip and realrtsp modules and fails to connect, no matter which options it
-  is given. `ffplay` carries its own RTSP support in libavformat and works, so it leads on Linux;
-  the official Windows VLC build still has live555 and leads there.
+1. **`PATH`** — if `ffmpeg` is already installed, nothing is downloaded.
+2. **App data cache** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux, `%LocalAppData%\OnvifLib.Gui\ffmpeg\` on Windows.
+3. **A path you type** in the player bar (kept in `settings.json`).
+4. **Download** — the **Download ffmpeg** button, and the first **Play** if nothing else was found.
+   That fetches a pinned **LGPL** BtbN build for `win-x64` or `linux-x64`, checks SHA256, and
+   extracts only the `ffmpeg` binary. Other RIDs are told to install ffmpeg themselves
+   (`sudo apt install ffmpeg` on Linux).
 
-  For the same reason the transport preference is passed to VLC as the MRL option `:rtsp-tcp`
-  rather than the global `--rtsp-tcp` flag. That flag belongs to live555, and a VLC built without
-  it rejects the unknown option and refuses to start — an MRL option no module claims is simply
-  ignored. A player that starts and then dies is reported in the status bar, so this kind of
-  failure is visible in the app rather than only to whoever launched it from a terminal.
+The repository and the OnvifLib NuGet package **do not ship ffmpeg**. The download is a separate
+LGPL program; this sample stays MIT.
 
-**The password is passed to the player on its command line**, so it is visible in `ps` or Task
-Manager. VLC's `--rtsp-pwd` is no better (same `argv`) and ffplay has no alternative, so the app
-discloses it rather than pretending otherwise. Everything the app *displays* or *logs* has the
-password blanked; only the clipboard and the player get the real URI.
+JPEG **snapshots** remain available on the Media tab (polled, never overlapping).
+`MediaService.GetImage()` still has no profile token — it always uses the first profile. The URL
+box next to it calls `MediaService.DownloadImageAsync` so any other snapshot URI can still be
+fetched. Thumbnails in the device list use the same JPEG path, not a second live decoder.
+
+An **external player** (VLC / ffplay / mpv) is still offered on the Media tab as a fallback. The
+default differs by platform for an empirical reason: **the VLC packaged for current Debian and
+Ubuntu no longer ships the live555 demuxer**, so it cannot open a plain RTSP stream. `ffplay`
+carries its own RTSP support and leads on Linux; the official Windows VLC build still has live555
+and leads there.
+
+**The password is passed to ffmpeg and to any external player on the command line**, so it is
+visible in `ps` or Task Manager. Everything the app *displays* or *logs* has the password blanked;
+only the child process and the clipboard get the real URI.
+
+Closing the window kills the ffmpeg process. Switching the selected camera stops the current
+stream before the next one starts.
 
 ## Things worth knowing while using it
 
 - **"Advertised, but the library could not create a client"** on a tab means the camera lists the
   service and the library still could not talk to it. In practice that is almost always a rejected
   credential — check the Log tab.
-- **Capture SOAP** in the connection bar decides whether a logger is handed to `Camera.Create`,
+- **Capture SOAP** in the top bar decides whether a logger is handed to `Camera.Create`,
   which is what switches on the request/response dump. It cannot be changed on a live connection,
-  so it takes effect on the next connect. The Log tab's level filter then decides whether those
+  so it takes effect on the next login. The Log tab's level filter then decides whether those
   entries are kept, and it applies where they are produced — leaving it above Debug genuinely
   stops paying for the dumps.
 - **Imaging sends only what you tick.** The library treats an omitted value as "leave unchanged"
@@ -123,12 +140,17 @@ handles both pointer events itself — it captures the pointer on press and rais
 release — and marks them handled, so a XAML attribute subscription is never called. The failure
 mode is silent: the buttons look and feel normal, and no request is ever sent.
 
+The live player is one `VideoPlayerViewModel` shared by Live, Media and PTZ. Switching those tabs
+must not restart ffmpeg. Switching the selected camera must.
+
 ## Requirements
 
 The library targets `net10.0`, so this does too — a project cannot reference a library on a newer
 target framework. Avalonia is pinned to 11.3.13 across all its packages: mismatched versions
 produce obscure XAML-compiler errors, and `Avalonia.Controls.DataGrid` stops at 11.3.13 in the
 11.3 line, so a higher core version drags the DataGrid to 12.x and fails the restore.
+
+ffmpeg is optional until you press Play: `--selftest` constructs `VideoView` without it.
 
 ```bash
 # Self-contained builds, no runtime needed on the target

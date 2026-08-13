@@ -1,67 +1,92 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using OnvifLib.Gui.Infrastructure;
 using OnvifLib.Gui.Models;
 
 namespace OnvifLib.Gui.ViewModels;
 
 /// <summary>
-/// The shell: the connection bar, the shared session, and the tabs.
+/// The shell: device list, the selected session, the shared live player, and the service tabs.
 /// </summary>
 public sealed partial class MainWindowViewModel : ObservableObject
 {
   private readonly UiLogger _logger = new();
   private readonly DeferredDialogService _dialogs = new();
+  private int _bindGeneration;
+  private bool _restoring;
+  private bool _binding;
 
   public MainWindowViewModel()
   {
     Runner = new OperationRunner(_logger);
 
-    // Restored before the tabs are built so the connection bar is already filled in when the
-    // window first appears.
     var settings = AppSettings.Load();
-    _ip = settings.Ip;
-    _port = settings.Port;
-    _user = settings.User;
     _timeoutSeconds = settings.TimeoutSeconds;
     _captureSoap = settings.CaptureSoap;
-    _rememberPassword = settings.RememberPassword;
-    _password = settings.RememberPassword ? settings.Password : "";
+    _autoPlayLive = settings.AutoPlayLive;
+
+    Video = new VideoPlayerViewModel(Runner)
+    {
+      CustomFfmpegPath = settings.FfmpegPath,
+      FrameWidth = settings.VideoWidth > 0 ? settings.VideoWidth : 640,
+      FrameHeight = settings.VideoHeight > 0 ? settings.VideoHeight : 360,
+      FrameRate = settings.VideoFps > 0 ? settings.VideoFps : 12,
+    };
+    Video.RefreshFfmpegStatus();
+
+    Devices = new DeviceListViewModel(Runner, _logger, ConnectDeviceAsync);
 
     Discovery = new DiscoveryViewModel(Runner, _logger) { Shell = this };
     Device = new DeviceViewModel(Runner, _logger, _dialogs);
-    Media = new MediaViewModel(Runner, _logger);
-    Ptz = new PtzViewModel(Runner, _logger);
+    Media = new MediaViewModel(Runner, _logger) { Video = Video };
+    Ptz = new PtzViewModel(Runner, _logger) { Video = Video };
     Imaging = new ImagingViewModel(Runner, _logger);
     Events = new EventsViewModel(Runner, _logger);
     Analytics = new AnalyticsViewModel(Runner, _logger, _dialogs);
-    Recording = new RecordingViewModel(Runner, _logger, _dialogs) { Media = Media };
+    Replay = new VideoPlayerViewModel(Runner)
+    {
+      CustomFfmpegPath = settings.FfmpegPath,
+      FrameWidth = settings.VideoWidth > 0 ? settings.VideoWidth : 640,
+      FrameHeight = settings.VideoHeight > 0 ? settings.VideoHeight : 360,
+      FrameRate = settings.VideoFps > 0 ? settings.VideoFps : 12,
+      ShowStreamPicker = false,
+      EmptyHint = "no archive playing",
+      Status = "select a recording and press Play archive",
+    };
+    Replay.RefreshFfmpegStatus();
+    Recording = new RecordingViewModel(Runner, _logger, _dialogs) { Media = Media, Video = Replay };
     DeviceIo = new DeviceIoViewModel(Runner, _logger, _dialogs);
     Log = new LogViewModel(Runner, _logger);
 
     Tabs = [Discovery, Device, Media, Ptz, Imaging, Events, Analytics, Recording, DeviceIo, Log];
 
-    // PTZ and imaging are both addressed through the media profile, so they follow the one
-    // selection rather than each keeping its own.
     Media.ProfileSelected += profile =>
     {
       Ptz.SetProfile(profile);
       Imaging.SetProfile(profile);
+      if (!_binding) _ = ReloadDependentTabsAsync();
     };
 
-    // The analytics configuration tokens come from the media service and have no other source.
     Media.AnalyticsConfigsLoaded += configs => Analytics.SetConfigurations(configs);
 
     Discovery.UseRequested += (ip, port, xaddr) =>
     {
-      Ip = ip;
-      Port = port;
-      Xaddr = xaddr;
-      Runner.Report($"Connection bar set to {ip}:{port}{(xaddr is null ? "" : $" ({xaddr})")}");
+      Devices.AddOrUpdate(ip, port, xaddr, user: Devices.User, password: Devices.Password);
+      Runner.Report($"Device list: {ip}:{port}");
     };
+
+    Devices.SelectionCommitted += device => _ = BindSelectionAsync(device);
+
+    _restoring = true;
+    Devices.Load(settings.Devices, settings.Ip, settings.Port, settings.User, settings.Password, settings.RememberPassword);
+    _restoring = false;
+    OnPropertyChanged(nameof(ConnectionText));
+    Devices.ConnectSelectedIfNeeded();
   }
 
   public OperationRunner Runner { get; }
+  public DeviceListViewModel Devices { get; }
+  public VideoPlayerViewModel Video { get; }
+  public VideoPlayerViewModel Replay { get; }
 
   public DiscoveryViewModel Discovery { get; }
   public DeviceViewModel Device { get; }
@@ -79,21 +104,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
   /// <summary>Supplied by the window once it exists, since a dialog needs an owner.</summary>
   public void AttachDialogs(IDialogService dialogs) => _dialogs.Inner = dialogs;
 
-  // ── connection bar ─────────────────────────────────────────────────────────────
-
-  [ObservableProperty] private string _ip = "192.168.1.10";
-  [ObservableProperty] private int _port = 80;
-  [ObservableProperty] private string _user = "admin";
-  [ObservableProperty] private string _password = "";
   [ObservableProperty] private double _timeoutSeconds = 15;
-  [ObservableProperty] private bool _revealPassword;
-
-  /// <summary>
-  /// Off by default, and the label says the password is stored in clear text. A sample that has
-  /// to run unchanged on Windows and Linux has no key store to hand, so the honest options are
-  /// "do not store it" or "store it and say so".
-  /// </summary>
-  [ObservableProperty] private bool _rememberPassword;
+  [ObservableProperty] private bool _autoPlayLive = true;
 
   /// <summary>
   /// Passing a logger to Camera.Create is what switches on the SOAP request/response dump inside
@@ -102,8 +114,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
   /// </summary>
   [ObservableProperty] private bool _captureSoap = true;
 
-  /// <summary>Set from the Discovery tab so a camera on a non-standard path still connects.</summary>
-  [ObservableProperty] private string? _xaddr;
+  /// <summary>
+  /// Matches the TabControl in MainWindow.axaml. Used to load a tab's read-only data when it
+  /// becomes visible, rather than firing every service on login.
+  /// </summary>
+  [ObservableProperty] private int _selectedTabIndex;
 
   [ObservableProperty]
   [NotifyPropertyChangedFor(nameof(IsConnected))]
@@ -113,67 +128,137 @@ public sealed partial class MainWindowViewModel : ObservableObject
   public bool IsConnected => Session is not null;
 
   public string ConnectionText => Session is { } session
-    ? $"connected — {session.Url}"
-    : "not connected";
+    ? $"selected — {session.Url}"
+    : Devices.Selected is { } device
+      ? $"selected — {device.AddressText} (offline)"
+      : "no device selected";
 
-  /// <summary>
-  /// Writes the connection bar back to disk. Called on a successful connect and at shutdown, not
-  /// on every keystroke: the file is a convenience, not a document.
-  /// </summary>
+  public string? User => Devices.User;
+  public string? Password => Devices.Password;
+
   public void SaveSettings()
   {
+    Devices.ApplyFieldsToSelected();
     var failure = new AppSettings
     {
-      Ip = Ip,
-      Port = Port,
-      User = User,
+      Ip = Devices.Ip,
+      Port = Devices.Port,
+      User = Devices.User,
       TimeoutSeconds = TimeoutSeconds,
       CaptureSoap = CaptureSoap,
-      RememberPassword = RememberPassword,
-      Password = Password,
+      RememberPassword = Devices.RememberPassword,
+      Password = Devices.Password,
+      FfmpegPath = Video.CustomFfmpegPath,
+      VideoWidth = Video.FrameWidth,
+      VideoHeight = Video.FrameHeight,
+      VideoFps = Video.FrameRate,
+      AutoPlayLive = AutoPlayLive,
+      Devices = Devices.Snapshot().ToList(),
     }.Save();
 
     if (failure is not null) _logger.Warning($"could not save {AppSettings.Path}: {failure}");
   }
 
-  [RelayCommand]
-  private async Task ConnectAsync()
+  private async Task<CameraSession?> ConnectDeviceAsync(DeviceEntry device)
   {
-    await DisconnectAsync();
+    var (ok, session) = await Runner.RunAsync($"Connect {device.AddressText}", () => CameraSession.ConnectAsync(
+      device.Ip, device.Port, device.User, device.Password, TimeoutSeconds, CaptureSoap ? _logger : null, device.Xaddr));
 
-    var (ok, session) = await Runner.RunAsync($"Connect to {Ip}:{Port}", () => CameraSession.ConnectAsync(
-      Ip, Port, User, Password, TimeoutSeconds, CaptureSoap ? _logger : null, Xaddr));
+    if (!ok || session is null) return null;
+    SaveSettings();
+    return session;
+  }
 
-    if (!ok || session is null) return;
+  private async Task BindSelectionAsync(DeviceEntry? device)
+  {
+    if (_restoring) return;
+
+    var generation = ++_bindGeneration;
+    var session = device?.Session;
+
+    foreach (var tab in Tabs.Where(t => t.IsSessionScoped))
+      await tab.ShutdownAsync();
+
+    await Video.StopInternalAsync();
+
+    if (generation != _bindGeneration) return;
+
+    _binding = true;
+    try
+    {
+      foreach (var tab in Tabs) tab.SetSession(session);
+
+      // Imaging/PTZ follow the media profile. SetSession on Imaging runs OnCleared *after* Media
+      // has already pushed the new profile, so the token has to be applied again here.
+      var profile = Media.SelectedProfile ?? session?.Media?.GetProfiles().FirstOrDefault();
+      Ptz.SetProfile(profile);
+      Imaging.SetProfile(profile);
+    }
+    finally { _binding = false; }
 
     Session = session;
-    foreach (var tab in Tabs) tab.SetSession(session);
+    OnPropertyChanged(nameof(ConnectionText));
+    await ActivateVisibleTabAsync();
 
-    // Only after a connection that worked — there is no point remembering a wrong address.
-    SaveSettings();
+    if (session?.Media is { } media)
+    {
+      var profiles = media.GetProfiles();
+      Video.SetProfiles(profiles);
+      Video.ResolveUri = async token =>
+      {
+        var uri = await media.GetStreamUri(token);
+        return session is null ? uri : RtspCredentials.Inject(uri, session.Camera.User, session.Camera.Password);
+      };
+
+      if (AutoPlayLive) await Video.PlaySelectedAsync();
+    }
+    else
+    {
+      Video.ClearProfiles();
+      Video.ResolveUri = null;
+    }
   }
 
-  [RelayCommand]
-  private async Task DisconnectAsync()
+  partial void OnSelectedTabIndexChanged(int value) => _ = ActivateVisibleTabAsync();
+
+  private async Task ActivateVisibleTabAsync()
   {
-    if (Session is not { } session) return;
-
-    // Order matters: the tabs must release their bitmaps, stop their polling loops and cancel
-    // their event subscription before the services they were using are disposed.
-    foreach (var tab in Tabs) await tab.ShutdownAsync();
-    foreach (var tab in Tabs) tab.SetSession(null);
-
-    Session = null;
-    session.Dispose();
-    Runner.Report("Disconnected");
+    if (_restoring) return;
+    var tab = TabAt(SelectedTabIndex);
+    if (tab is null || (tab.RequiresConnection && !tab.IsAvailable)) return;
+    await tab.ActivateAsync();
   }
+
+  private async Task ReloadDependentTabsAsync()
+  {
+    if (SelectedTabIndex == 3) await Ptz.ActivateAsync();
+    if (SelectedTabIndex == 4) await Imaging.ActivateAsync();
+  }
+
+  /// <summary>Index of the TabControl in MainWindow.axaml (Live is 0 and is not a service tab).</summary>
+  private TabViewModelBase? TabAt(int index) => index switch
+  {
+    1 => Device,
+    2 => Media,
+    3 => Ptz,
+    4 => Imaging,
+    5 => Events,
+    6 => Analytics,
+    7 => Recording,
+    8 => DeviceIo,
+    9 => Discovery,
+    10 => Log,
+    _ => null,
+  };
 
   /// <summary>Called from the application's shutdown handler before the process exits.</summary>
   public async Task ShutdownAsync()
   {
     SaveSettings();
+    await Video.DisposeAsync();
+    await Replay.DisposeAsync();
     foreach (var tab in Tabs) await tab.ShutdownAsync();
-    Session?.Dispose();
+    await Devices.ShutdownAsync();
     Session = null;
   }
 

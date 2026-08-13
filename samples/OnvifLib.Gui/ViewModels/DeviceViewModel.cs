@@ -63,6 +63,14 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
     AliveText = "connected";
   }
 
+  public override async Task ActivateAsync()
+  {
+    if (Session is null) return;
+    await PingAsync();
+    await ReadStorageSupportAsync();
+    await ReadStorageConfigurationsAsync();
+  }
+
   protected override void OnCleared()
   {
     Services.Clear();

@@ -96,7 +96,7 @@ Two runnable applications live in [`samples/`](samples), both referencing the li
 | | |
 |---|---|
 | [**OnvifLib.Probe**](samples/OnvifLib.Probe) | A console harness that walks the whole public API against a camera and prints OK/FAIL/SKIP per call, with a summary and an exit code. Read-only by default; `--allow-writes` adds writes that undo themselves. Good as a smoke test and as a way to find out what a camera actually supports. |
-| [**OnvifLib.Gui**](samples/OnvifLib.Gui) | A cross-platform Avalonia test bench (Windows and Linux) with a tab per service: discovery, device, media and snapshots, PTZ, imaging, events, analytics, Profile G and device I/O, plus a log pane that can capture the full SOAP exchange. |
+| [**OnvifLib.Gui**](samples/OnvifLib.Gui) | A cross-platform Avalonia device manager (Windows and Linux) in the style of ONVIF Device Manager: a camera list with snapshots, WS-Discovery, in-window live video via ffmpeg, and a tab per service (device, media, PTZ, imaging, events, analytics, Profile G, device I/O) plus a SOAP log. Several cameras can stay connected; the tabs follow the selected one. |
 
 ```bash
 dotnet run --project samples/OnvifLib.Probe -- --discovery

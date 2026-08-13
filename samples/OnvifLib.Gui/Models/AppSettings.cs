@@ -4,12 +4,12 @@ using System.Text.Json.Serialization;
 namespace OnvifLib.Gui.Models;
 
 /// <summary>
-/// What the connection bar had last time, so a test session does not start with retyping.
+/// Last connection defaults, remembered devices, and video-player preferences.
 /// </summary>
 /// <remarks>
-/// Stored as plain JSON under the user's config directory. The password is only written when the
-/// user asks for it, and then in clear text — there is nowhere to hide it in a sample that has to
-/// run unchanged on Windows and Linux, so the checkbox says so rather than implying otherwise.
+/// Stored as plain JSON under the user's config directory. Passwords are only written when the
+/// user asks for it, and then in clear text — there is nowhere to hide them in a sample that has
+/// to run unchanged on Windows and Linux, so the checkbox says so rather than implying otherwise.
 /// </remarks>
 public sealed class AppSettings
 {
@@ -21,6 +21,14 @@ public sealed class AppSettings
 
   public bool RememberPassword { get; set; }
   public string Password { get; set; } = "";
+
+  public string FfmpegPath { get; set; } = "";
+  public int VideoWidth { get; set; } = 640;
+  public int VideoHeight { get; set; } = 360;
+  public int VideoFps { get; set; } = 12;
+  public bool AutoPlayLive { get; set; } = true;
+
+  public List<SavedDevice> Devices { get; set; } = [];
 
   [JsonIgnore]
   public static string Path { get; } = System.IO.Path.Combine(
@@ -50,7 +58,7 @@ public sealed class AppSettings
       var directory = System.IO.Path.GetDirectoryName(Path);
       if (directory is not null) Directory.CreateDirectory(directory);
 
-      var toWrite = RememberPassword ? this : ShallowCopyWithoutPassword();
+      var toWrite = StripUnrememberedPasswords();
       File.WriteAllText(Path, JsonSerializer.Serialize(toWrite, new JsonSerializerOptions { WriteIndented = true }));
       return null;
     }
@@ -60,14 +68,29 @@ public sealed class AppSettings
     }
   }
 
-  private AppSettings ShallowCopyWithoutPassword() => new()
+  private AppSettings StripUnrememberedPasswords() => new()
   {
     Ip = Ip,
     Port = Port,
     User = User,
     TimeoutSeconds = TimeoutSeconds,
     CaptureSoap = CaptureSoap,
-    RememberPassword = false,
-    Password = "",
+    RememberPassword = RememberPassword,
+    Password = RememberPassword ? Password : "",
+    FfmpegPath = FfmpegPath,
+    VideoWidth = VideoWidth,
+    VideoHeight = VideoHeight,
+    VideoFps = VideoFps,
+    AutoPlayLive = AutoPlayLive,
+    Devices = Devices.Select(d => new SavedDevice
+    {
+      Ip = d.Ip,
+      Port = d.Port,
+      Xaddr = d.Xaddr,
+      User = d.User,
+      DisplayName = d.DisplayName,
+      RememberPassword = d.RememberPassword,
+      Password = d.RememberPassword ? d.Password : "",
+    }).ToList(),
   };
 }

@@ -41,7 +41,7 @@
           <DataGrid Grid.Row="0" ItemsSource="{Binding Relays}" SelectedItem="{Binding SelectedRelay}"
                     IsReadOnly="True" GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+              <DataGridTextColumn Header="Name" Binding="{Binding Token}" Width="*" />
               <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto" />
               <DataGridTextColumn Header="Idle" Binding="{Binding IdleState}" Width="Auto" />
               <DataGridTextColumn Header="Delay ms" Binding="{Binding DelayMs}" Width="Auto" />
@@ -50,7 +50,7 @@
           <DataGrid Grid.Row="2" ItemsSource="{Binding RelayOptions}" IsReadOnly="True"
                     GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
-              <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+              <DataGridTextColumn Header="Name" Binding="{Binding Token}" Width="*" />
               <DataGridCheckBoxColumn Header="Discrete" Binding="{Binding Discrete}" Width="Auto" />
               <DataGridTextColumn Header="Min ms" Binding="{Binding MinDelayMs}" Width="Auto" />
               <DataGridTextColumn Header="Max ms" Binding="{Binding MaxDelayMs}" Width="Auto" />
@@ -80,7 +80,7 @@
         <DataGrid ItemsSource="{Binding Inputs}" SelectedItem="{Binding SelectedInput}"
                   IsReadOnly="True" GridLinesVisibility="Horizontal">
           <DataGrid.Columns>
-            <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+            <DataGridTextColumn Header="Name" Binding="{Binding Token}" Width="*" />
             <DataGridTextColumn Header="Idle state" Binding="{Binding IdleState}" Width="Auto" />
           </DataGrid.Columns>
         </DataGrid>
