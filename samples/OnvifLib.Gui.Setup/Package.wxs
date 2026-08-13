@@ -1,0 +1,66 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <!--
+    Per-machine install into Program Files. That is the point of shipping an MSI
+    alongside the zip: Explorer copies Mark-of-the-Web onto extracted files, and
+    an elevated copy into Program Files does not.
+  -->
+  <Package
+    Name="OnvifLib.Gui"
+    Manufacturer="TreeAlarm"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="7f3a9c2e-1b84-4d6a-9e21-c5b8f04a7d13"
+    Language="1033"
+    Scope="perMachine">
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of OnvifLib.Gui is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="AppIcon.exe" SourceFile="!(bindpath.PublishDir)OnvifLib.Gui.exe" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon.exe" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/treealarm/OnvifLib" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/treealarm/OnvifLib" />
+    <Property Id="ARPCOMMENTS" Value="ONVIF device manager and test bench" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="CompanyFolder" Name="TreeAlarm">
+        <Directory Id="INSTALLFOLDER" Name="OnvifLib.Gui" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <!-- Every file from the publish folder, including ffmpeg/ when the release job copied it. -->
+    <Feature Id="App" Title="OnvifLib.Gui" Level="1">
+      <Files Include="!(bindpath.PublishDir)**" Directory="INSTALLFOLDER">
+        <Exclude Files="!(bindpath.PublishDir)**\*.pdb" />
+      </Files>
+      <ComponentGroupRef Id="Shortcuts" />
+    </Feature>
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="Shortcuts" Directory="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut" Guid="e2c1a847-6b3d-4f90-a1e5-9d47c28b6f0a">
+        <Shortcut
+          Id="AppStartMenuShortcut"
+          Name="OnvifLib.Gui"
+          Description="ONVIF device manager"
+          Target="[INSTALLFOLDER]OnvifLib.Gui.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="AppIcon.exe" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\TreeAlarm\OnvifLib.Gui"
+          Name="Installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

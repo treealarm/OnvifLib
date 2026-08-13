@@ -1,0 +1,44 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!--
+    MSI for the self-contained win-x64 GUI. Not built as part of the default solution
+    configuration: Linux CI has no use for it, and the payload is a publish folder
+    rather than this project's output. See README.md for the publish + build commands.
+  -->
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>OnvifLib.Gui</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <!-- MSI ProductVersion is major.minor.build. The release workflow passes the gui-* tag. -->
+    <Version Condition="'$(Version)' == '' or '$(Version)' == '*Undefined*'">1.0.0</Version>
+    <DefineConstants>ProductVersion=$(Version)</DefineConstants>
+    <GuiPublishDir Condition="'$(GuiPublishDir)' == ''">$(MSBuildThisFileDirectory)..\..\artifacts\OnvifLib.Gui-win-x64\</GuiPublishDir>
+    <GuiPublishDir Condition="!HasTrailingSlash('$(GuiPublishDir)')">$(GuiPublishDir)\</GuiPublishDir>
+  </PropertyGroup>
+
+  <Import Project="..\OnvifLib.Gui\ffmpeg.props" />
+
+  <ItemGroup>
+    <BindPath Include="$(GuiPublishDir)">
+      <BindName>PublishDir</BindName>
+    </BindPath>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+  <Target Name="RequirePublishedGui" BeforeTargets="BundleFfmpeg">
+    <Error
+      Condition="!Exists('$(GuiPublishDir)OnvifLib.Gui.exe')"
+      Text="Publish the GUI first (self-contained win-x64) into '$(GuiPublishDir)'. Missing OnvifLib.Gui.exe." />
+  </Target>
+
+  <Target Name="BundleFfmpeg" BeforeTargets="BeforeBuild">
+    <!-- Trailing backslash + double quotes eats -Url/-Sha256 in powershell.exe. -->
+    <PropertyGroup>
+      <_FfmpegDestDir>$([System.IO.Path]::GetFullPath($([System.String]::Copy('$(GuiPublishDir)').Trim().TrimEnd('\'))))</_FfmpegDestDir>
+    </PropertyGroup>
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)bundle-ffmpeg.ps1&quot; -DestinationDir &quot;$(_FfmpegDestDir)&quot; -Url &quot;$(FfmpegWinX64Url)&quot; -Sha256 &quot;$(FfmpegWinX64Sha256)&quot;" />
+    <Error
+      Condition="!Exists('$(GuiPublishDir)ffmpeg\ffmpeg.exe')"
+      Text="ffmpeg.exe was not copied into '$(GuiPublishDir)ffmpeg\'. The MSI would install an app that cannot play video." />
+  </Target>
+</Project>
+

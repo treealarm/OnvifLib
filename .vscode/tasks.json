@@ -57,6 +57,42 @@
             "problemMatcher": "$msCompile"
         },
         {
+            "label": "publish gui win-x64",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/samples/OnvifLib.Gui/OnvifLib.Gui.csproj",
+                "-c",
+                "Release",
+                "-r",
+                "win-x64",
+                "--self-contained",
+                "-o",
+                "${workspaceFolder}/artifacts/OnvifLib.Gui-win-x64",
+                "-p:PublishSingleFile=false",
+                "-p:DebugType=None",
+                "-p:DebugSymbols=false"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            // Harvests artifacts/OnvifLib.Gui-win-x64 into an MSI. Windows only; publish first.
+            "label": "msi",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/samples/OnvifLib.Gui.Setup/OnvifLib.Gui.Setup.wixproj",
+                "-c",
+                "Release",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "dependsOn": ["publish gui win-x64"],
+            "problemMatcher": "$msCompile"
+        },
+        {
             // Loads every GUI view and fails if any of them does not construct. A TabControl only
             // realises the selected tab, so this is what catches a XAML error in a tab nobody
             // clicked. Cheap enough to run after touching any .axaml.

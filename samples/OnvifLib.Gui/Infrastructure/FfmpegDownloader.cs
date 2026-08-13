@@ -11,6 +11,7 @@ namespace OnvifLib.Gui.Infrastructure;
 public static class FfmpegDownloader
 {
   // Dated BtbN autobuild, LGPL (not GPL), n7.1.x. SHA256 is of the archive, not the extracted binary.
+  // Windows URL/SHA must match samples/OnvifLib.Gui/ffmpeg.props (MSI + win-x64 publish).
   private static readonly Build LinuxX64 = new(
     "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz",
     "2fc7aa2eb6e75807170a34fec11af8eea3bc39875cf001d26eabc1605de99a87",

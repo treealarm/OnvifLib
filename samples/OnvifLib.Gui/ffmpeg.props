@@ -1,0 +1,11 @@
+<Project>
+  <!--
+    Pinned BtbN LGPL win-x64 build. Must stay in lockstep with
+    FfmpegDownloader.WindowsX64 and .github/workflows/release-gui.yml.
+    The archive is not committed; the MSI / publish output fetch it at pack time.
+  -->
+  <PropertyGroup>
+    <FfmpegWinX64Url>https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-win64-lgpl-7.1.zip</FfmpegWinX64Url>
+    <FfmpegWinX64Sha256>8fdbe7f03b64134fecf26166a22d4b4f5be0756901461d01fe5ad7dbc03b5ce7</FfmpegWinX64Sha256>
+  </PropertyGroup>
+</Project>

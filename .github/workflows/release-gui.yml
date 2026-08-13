@@ -94,8 +94,70 @@ jobs:
           path: artifacts/OnvifLib.Gui-${{ matrix.rid }}.zip
           if-no-files-found: error
 
-  release:
+  msi:
     needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download win-x64 zip
+        uses: actions/download-artifact@v4
+        with:
+          name: OnvifLib.Gui-win-x64
+          path: dist
+
+      - name: Unpack payload
+        shell: pwsh
+        run: |
+          Expand-Archive -Path dist/OnvifLib.Gui-win-x64.zip -DestinationPath artifacts -Force
+          if (-not (Test-Path artifacts/OnvifLib.Gui-win-x64/OnvifLib.Gui.exe)) {
+            throw "expected artifacts/OnvifLib.Gui-win-x64/OnvifLib.Gui.exe after unzip"
+          }
+
+      - name: MSI version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${GITHUB_REF_NAME}"; fi
+          VER="${TAG#gui-}"
+          if ! echo "$VER" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "tag '$TAG' is not gui-major.minor[.build]; using 0.0.0 for a non-tag build"
+            VER="0.0.0"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $publish = (Resolve-Path artifacts/OnvifLib.Gui-win-x64).Path
+          dotnet build samples/OnvifLib.Gui.Setup/OnvifLib.Gui.Setup.wixproj `
+            -c Release `
+            -p:GuiPublishDir=$publish `
+            -p:Version=${{ steps.ver.outputs.version }} `
+            --nologo
+          $msi = Get-ChildItem -Recurse samples/OnvifLib.Gui.Setup/bin -Filter OnvifLib.Gui.msi |
+            Select-Object -First 1
+          if (-not $msi) { throw "WiX build produced no OnvifLib.Gui.msi" }
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Copy-Item $msi.FullName artifacts/OnvifLib.Gui-win-x64.msi
+          Get-Item artifacts/OnvifLib.Gui-win-x64.msi | Format-List Name, Length, FullName
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: OnvifLib.Gui-win-x64-msi
+          path: artifacts/OnvifLib.Gui-win-x64.msi
+          if-no-files-found: error
+
+  release:
+    needs: [build, msi]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
@@ -104,14 +166,15 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Locate zips
+      - name: Locate packages
         id: zips
         run: |
           set -euo pipefail
-          find dist -type f -name 'OnvifLib.Gui-*.zip' -print
+          find dist -type f \( -name 'OnvifLib.Gui-*.zip' -o -name 'OnvifLib.Gui-*.msi' \) -print
           test -f dist/OnvifLib.Gui-linux-x64.zip
           test -f dist/OnvifLib.Gui-win-x64.zip
-          ls -lh dist/*.zip
+          test -f dist/OnvifLib.Gui-win-x64.msi
+          ls -lh dist/OnvifLib.Gui-*
 
       - name: Release meta
         id: meta
@@ -130,6 +193,7 @@ jobs:
           files: |
             dist/OnvifLib.Gui-linux-x64.zip
             dist/OnvifLib.Gui-win-x64.zip
+            dist/OnvifLib.Gui-win-x64.msi
           fail_on_unmatched_files: true
           body: |
             ## OnvifLib.Gui
@@ -137,10 +201,14 @@ jobs:
             Desktop ONVIF device manager (Avalonia): discover/add cameras, live video, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
 
             ### Downloads
+            - **OnvifLib.Gui-win-x64.msi** — Windows x64 installer (Program Files, Start Menu). Prefer this over the zip so Windows does not mark the binaries as downloaded from the Internet.
+            - **OnvifLib.Gui-win-x64.zip** — Windows x64 portable, self-contained .NET 10 + LGPL `ffmpeg.exe`
             - **OnvifLib.Gui-linux-x64.zip** — Ubuntu / Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
-            - **OnvifLib.Gui-win-x64.zip** — Windows x64, self-contained .NET 10 + LGPL `ffmpeg.exe`
 
             Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app — no separate install for in-window playback.
+
+            ### Run (Windows)
+            Install `OnvifLib.Gui-win-x64.msi`, or unzip the portable zip and run `OnvifLib.Gui.exe`.
 
             ### Run (Linux)
             ```bash
@@ -148,9 +216,6 @@ jobs:
             cd OnvifLib.Gui-linux-x64
             ./OnvifLib.Gui
             ```
-
-            ### Run (Windows)
-            Unzip `OnvifLib.Gui-win-x64.zip` and run `OnvifLib.Gui.exe`.
 
             The library NuGet remains separate: `dotnet add package OnvifLib`.
 

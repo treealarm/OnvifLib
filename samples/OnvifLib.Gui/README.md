@@ -13,8 +13,11 @@ decodes video, and only here.
 
 ## Running it
 
-Prebuilt **Linux x64** and **Windows x64** zips (each includes an LGPL `ffmpeg` next to the app):
-[GitHub Releases](https://github.com/treealarm/OnvifLib/releases).
+Prebuilt packages (each includes an LGPL `ffmpeg` next to the app) are on
+[GitHub Releases](https://github.com/treealarm/OnvifLib/releases): Linux x64 zip,
+Windows x64 zip, and a Windows MSI. Prefer the MSI — it installs into Program
+Files, so Explorer does not stamp Mark-of-the-Web onto every extracted binary.
+How that package is built: [OnvifLib.Gui.Setup](../OnvifLib.Gui.Setup/README.md).
 
 ```bash
 dotnet run --project samples/OnvifLib.Gui
