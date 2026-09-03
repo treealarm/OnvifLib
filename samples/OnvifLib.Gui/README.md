@@ -1,39 +1,61 @@
 # OnvifLib.Gui
 
-A desktop ONVIF device manager and test bench for [OnvifLib](../../README.md), built with
-[Avalonia](https://avaloniaui.net/) so the same code runs on Windows and Linux. The layout follows
-ONVIF Device Manager: a list of cameras on the left, live video and the service tabs on the right.
+**A modern ONVIF Device Manager (ODM) alternative for Windows and Linux.**
 
-Where [OnvifLib.Probe](../OnvifLib.Probe/README.md) answers "does this camera work" in one
-non-interactive run, this answers "what does this camera do when I poke it" — including the
-destructive operations the probe refuses to touch.
+Live video (including **H.264 and HEVC/H.265** via bundled ffmpeg), PTZ, imaging, events,
+analytics, Profile G archive replay, and Device I/O — in one Avalonia desktop app built on
+[OnvifLib](../../README.md).
+
+Classic [ONVIF Device Manager](https://sourceforge.net/projects/onvifdm/) is Windows-only and
+shows age on codecs and Profile G/M. This app is cross-platform, ships a current LGPL ffmpeg in
+the release zip, and still works as a full ONVIF test bench (including operations ODM-style tools
+often skip).
+
+Where [OnvifLib.Probe](../OnvifLib.Probe/README.md) answers “does this camera work” in one
+non-interactive run, this answers “what does this camera do when I poke it”.
 
 The **library** is still control-plane only (SOAP, RTSP URIs, JPEG snapshots). This sample is what
 decodes video, and only here.
 
-## Running it
+## Download
 
-Prebuilt packages (each includes an LGPL `ffmpeg` next to the app) are on
-[GitHub Releases](https://github.com/treealarm/OnvifLib/releases): Linux x64 zip,
-Windows x64 zip, and a Windows MSI. Prefer the MSI — it installs into Program
-Files, so Explorer does not stamp Mark-of-the-Web onto every extracted binary.
-How that package is built: [OnvifLib.Gui.Setup](../OnvifLib.Gui.Setup/README.md).
+**→ [GitHub Releases](https://github.com/treealarm/OnvifLib/releases)** — each package includes LGPL `ffmpeg` next to the app.
+
+| | |
+|---|---|
+| Windows | Prefer **`OnvifLib.Gui-win-x64.msi`** (WiX → Program Files, Start Menu; avoids Mark-of-the-Web on extracted files). Portable: unzip `OnvifLib.Gui-win-x64.zip`. Build notes: [OnvifLib.Gui.Setup](../OnvifLib.Gui.Setup/README.md). winget manifests: [`packaging/winget`](../../packaging/winget). |
+| Linux | Unzip `OnvifLib.Gui-linux-x64.zip` → run `./OnvifLib.Gui` (needs a desktop session). |
+
+No separate .NET or ffmpeg install for in-window playback. ffmpeg is also resolved from `PATH`,
+an app-data cache, or a path you type if you prefer your own build.
 
 ```bash
+# From source
 dotnet run --project samples/OnvifLib.Gui
 ```
 
-**Discover** (left pane) runs WS-Discovery and fills the device list. **Add** takes an address and
-port typed above the list. Selecting a camera connects it; **Connect** does the same for the
-already-selected row. Several cameras can stay connected; the tabs and the live player always
-follow the **selected** row.
+## Why not just ODM?
 
-The list, the last address, and video preferences are written back to `settings.json` under your
-config directory after a successful login and at exit. A password is only stored if you tick
-**Remember** on that device — and then in clear text, which is why it is off by default and labelled.
+| | ONVIF Device Manager | OnvifLib.Gui |
+|---|---|---|
+| Platforms | Windows | **Windows and Linux** |
+| Live codecs | Limited (HEVC often missing) | **H.264 / HEVC via ffmpeg** |
+| Install | Classic installer ecosystem | **WiX MSI** + portable zip ([winget](../../packaging/winget), Scoop) |
+| Profile G / M | Weak or absent on many builds | Search, archive replay, metadata/analytics configs |
+| Multi-camera | One context at a time in practice | Several connected; tabs follow the **selected** row |
+| Stack | Aging .NET / DirectShow-era player | .NET 10 + Avalonia + current ffmpeg |
 
-A tab the camera cannot support still opens and says so, rather than disappearing — that answer is
-usually the point of the exercise.
+Defaults still prefer the **substream** for live view (smooth UI); pick any profile — including a
+HEVC main stream — when you need it.
+
+## Using it
+
+**Discover** fills the list via WS-Discovery. **Add** takes an address and port. Selecting a camera
+connects it; **Connect** does the same for the already-selected row. Device list, last address, and
+video prefs go to `settings.json`. A password is stored only if you tick **Remember** (clear text —
+off by default).
+
+A tab the camera cannot support still opens and says so, rather than disappearing.
 
 ```bash
 # Loads every view and exits non-zero if any fails to construct. Needs a display.
@@ -62,20 +84,22 @@ dotnet run --project samples/OnvifLib.Gui -- --selftest
 Live video is decoded **inside the window**. The sample starts `ffmpeg`, reads raw BGRA frames from
 its stdout, and paints them on a reused `WriteableBitmap`. One stream at a time — the selected
 camera — defaulting to the **substream** (smallest profile) at 640×360 / 12 fps, because a 1440p
-HEVC main stream is expensive to decode into raw frames.
+HEVC main stream is expensive to decode into raw frames. ffmpeg handles **H.264 and HEVC** (and
+whatever else that build decodes); the GUI does not reimplement codecs.
 
 ffmpeg is located in this order:
 
-1. **`PATH`** — if `ffmpeg` is already installed, nothing is downloaded.
-2. **App data cache** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux, `%LocalAppData%\OnvifLib.Gui\ffmpeg\` on Windows.
-3. **A path you type** in the player bar (kept in `settings.json`).
-4. **Download** — the **Download ffmpeg** button, and the first **Play** if nothing else was found.
+1. **Next to the app** — release zips ship `ffmpeg/ffmpeg` (or `ffmpeg.exe`).
+2. **`PATH`** — if `ffmpeg` is already installed, nothing is downloaded.
+3. **App data cache** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux, `%LocalAppData%\OnvifLib.Gui\ffmpeg\` on Windows.
+4. **A path you type** in the player bar (kept in `settings.json`).
+5. **Download** — the **Download ffmpeg** button, and the first **Play** if nothing else was found.
    That fetches a pinned **LGPL** BtbN build for `win-x64` or `linux-x64`, checks SHA256, and
    extracts only the `ffmpeg` binary. Other RIDs are told to install ffmpeg themselves
    (`sudo apt install ffmpeg` on Linux).
 
-The repository and the OnvifLib NuGet package **do not ship ffmpeg**. The download is a separate
-LGPL program; this sample stays MIT.
+The repository and the OnvifLib NuGet package **do not ship ffmpeg** into source control. Release
+zips and the optional download are a separate LGPL program; this sample stays MIT.
 
 JPEG **snapshots** remain available on the Media tab (polled, never overlapping).
 `MediaService.GetImage()` still has no profile token — it always uses the first profile. The URL
@@ -147,7 +171,8 @@ release — and marks them handled, so a XAML attribute subscription is never ca
 mode is silent: the buttons look and feel normal, and no request is ever sent.
 
 The live player is one `VideoPlayerViewModel` shared by Live, Media and PTZ. Switching those tabs
-must not restart ffmpeg. Switching the selected camera must.
+must not restart ffmpeg. Switching the selected camera must. Profile G uses a separate archive
+player so live and replay do not fight.
 
 ## Requirements
 

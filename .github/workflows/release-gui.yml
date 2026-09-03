@@ -35,10 +35,10 @@ jobs:
 
     runs-on: ${{ matrix.runs_on }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
@@ -88,7 +88,7 @@ jobs:
           ls -lh "OnvifLib.Gui-${{ matrix.rid }}.zip"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: OnvifLib.Gui-${{ matrix.rid }}
           path: artifacts/OnvifLib.Gui-${{ matrix.rid }}.zip
@@ -98,15 +98,15 @@ jobs:
     needs: build
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
       - name: Download win-x64 zip
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: OnvifLib.Gui-win-x64
           path: dist
@@ -160,7 +160,7 @@ jobs:
           Get-Item artifacts/OnvifLib.Gui-win-x64.msi | Format-List Name, Length, FullName
 
       - name: Upload MSI
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: OnvifLib.Gui-win-x64-msi
           path: artifacts/OnvifLib.Gui-win-x64.msi
@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
@@ -208,14 +208,14 @@ jobs:
           body: |
             ## OnvifLib.Gui
 
-            Desktop ONVIF device manager (Avalonia): discover/add cameras, live video, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
+            Cross-platform **ONVIF Device Manager alternative** (Avalonia): discover/add cameras, live **H.264 / HEVC** via bundled ffmpeg, PTZ, imaging, events, analytics, Profile G archive replay, Device I/O.
 
             ### Downloads
-            - **OnvifLib.Gui-win-x64.msi** — Windows x64 installer (Program Files, Start Menu). Prefer this over the zip so Windows does not mark the binaries as downloaded from the Internet.
-            - **OnvifLib.Gui-win-x64.zip** — Windows x64 portable, self-contained .NET 10 + LGPL `ffmpeg.exe`
-            - **OnvifLib.Gui-linux-x64.zip** — Ubuntu / Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
+            - **OnvifLib.Gui-win-x64.msi** — Windows x64 (**WiX** installer → Program Files, Start Menu). Prefer this over the zip so Windows does not mark binaries as downloaded from the Internet.
+            - **OnvifLib.Gui-win-x64.zip** — Windows x64 portable (same payload; no separate installer)
+            - **OnvifLib.Gui-linux-x64.zip** — Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
 
-            Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app — no separate install for in-window playback.
+            Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app.
 
             ### Run (Windows)
             Install `OnvifLib.Gui-win-x64.msi`, or unzip the portable zip and run `OnvifLib.Gui.exe`.
@@ -227,8 +227,9 @@ jobs:
             ./OnvifLib.Gui
             ```
 
-            The library NuGet remains separate: `dotnet add package OnvifLib`.
+            Library NuGet (separate): `dotnet add package OnvifLib`.
 
             ### Notes
             - Linux needs a desktop session (X11/Wayland).
             - App is MIT; bundled `ffmpeg` is LGPL — see `ffmpeg/README.txt`.
+            - winget / Scoop manifests: `packaging/` in the repo.

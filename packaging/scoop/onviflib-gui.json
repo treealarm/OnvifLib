@@ -1,0 +1,37 @@
+{
+  "version": "1.2.0",
+  "description": "ONVIF Device Manager alternative with live H.264/HEVC via ffmpeg (Avalonia).",
+  "homepage": "https://github.com/treealarm/OnvifLib",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/treealarm/OnvifLib/releases/download/gui-1.2.0/OnvifLib.Gui-win-x64.zip",
+      "hash": "7deb21de7312461a1339d5b8d3575fdda056d3ec34d383bcce0c31bf5631b0d2",
+      "extract_dir": "OnvifLib.Gui-win-x64"
+    }
+  },
+  "bin": "OnvifLib.Gui.exe",
+  "shortcuts": [
+    [
+      "OnvifLib.Gui.exe",
+      "OnvifLib.Gui"
+    ]
+  ],
+  "checkver": {
+    "url": "https://api.github.com/repos/treealarm/OnvifLib/releases/latest",
+    "jsonpath": "$.tag_name",
+    "regex": "gui-([\\d.]+)"
+  },
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/treealarm/OnvifLib/releases/download/gui-$version/OnvifLib.Gui-win-x64.zip",
+        "extract_dir": "OnvifLib.Gui-win-x64"
+      }
+    }
+  },
+  "notes": [
+    "Bundled ffmpeg under ffmpeg/ is LGPL (BtbN). App is MIT.",
+    "For a Program Files install use the WiX MSI from Releases or winget (treealarm.OnvifLib.Gui)."
+  ]
+}

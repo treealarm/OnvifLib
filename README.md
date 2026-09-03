@@ -8,7 +8,9 @@
 
 📂 **Source code:** [github.com/treealarm/OnvifLib](https://github.com/treealarm/OnvifLib) — issues and pull requests welcome.
 
-🖥 **Desktop GUI (Linux / Windows x64):** [Releases](https://github.com/treealarm/OnvifLib/releases) — Avalonia test bench with in-window video (`ffmpeg` included). Windows: MSI installer or portable zip.
+🖥 **Desktop GUI — ONVIF Device Manager alternative (Windows & Linux):**
+[Releases](https://github.com/treealarm/OnvifLib/releases) — live H.264/HEVC via bundled ffmpeg, PTZ, Profile G/M, multi-camera.
+Windows: prefer the **MSI** (WiX) or portable zip; Linux: zip. Details: [`samples/OnvifLib.Gui`](samples/OnvifLib.Gui).
 
 ---
 
@@ -98,7 +100,7 @@ Two runnable applications live in [`samples/`](samples), both referencing the li
 | | |
 |---|---|
 | [**OnvifLib.Probe**](samples/OnvifLib.Probe) | A console harness that walks the whole public API against a camera and prints OK/FAIL/SKIP per call, with a summary and an exit code. Read-only by default; `--allow-writes` adds writes that undo themselves. Good as a smoke test and as a way to find out what a camera actually supports. |
-| [**OnvifLib.Gui**](samples/OnvifLib.Gui) | A cross-platform Avalonia device manager (Windows and Linux) in the style of ONVIF Device Manager: a camera list with snapshots, WS-Discovery, in-window live video via ffmpeg, and a tab per service (device, media, PTZ, imaging, events, analytics, Profile G, device I/O) plus a SOAP log. Several cameras can stay connected; the tabs follow the selected one. |
+| [**OnvifLib.Gui**](samples/OnvifLib.Gui) | A cross-platform **ONVIF Device Manager alternative** (Windows and Linux): camera list with snapshots, WS-Discovery, in-window live video via ffmpeg (**H.264 / HEVC**), and a tab per service (device, media, PTZ, imaging, events, analytics, Profile G, device I/O) plus a SOAP log. Several cameras can stay connected; the tabs follow the selected one. Prebuilt MSI / zips: [Releases](https://github.com/treealarm/OnvifLib/releases). WiX project: [`OnvifLib.Gui.Setup`](samples/OnvifLib.Gui.Setup). |
 
 ```bash
 dotnet run --project samples/OnvifLib.Probe -- --discovery
