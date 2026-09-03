@@ -1,34 +1,61 @@
 ﻿# OnvifLib
 
-[![NuGet](https://img.shields.io/nuget/v/OnvifLib.svg)](https://www.nuget.org/packages/OnvifLib)
-[![Downloads](https://img.shields.io/nuget/dt/OnvifLib.svg)](https://www.nuget.org/packages/OnvifLib)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+<p align="center">
+  <img src="docs/images/onviflib-banner.jpg" alt="OnvifLib — ONVIF Device Manager alternative" width="100%">
+</p>
 
-**OnvifLib** is a modern and lightweight .NET library for interacting with ONVIF-compliant IP cameras. It provides a simple interface to discover devices, control PTZ, retrieve media streams, and handle events over the ONVIF protocol.
+<p align="center">
+  <a href="https://www.nuget.org/packages/OnvifLib"><img src="https://img.shields.io/nuget/v/OnvifLib.svg?style=flat-square&label=NuGet" alt="NuGet"></a>
+  <a href="https://www.nuget.org/packages/OnvifLib"><img src="https://img.shields.io/nuget/dt/OnvifLib.svg?style=flat-square" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="MIT"></a>
+  <a href="https://github.com/treealarm/OnvifLib/releases"><img src="https://img.shields.io/github/v/release/treealarm/OnvifLib?filter=gui-*&style=flat-square&label=GUI%20release" alt="GUI release"></a>
+</p>
 
-📂 **Source code:** [github.com/treealarm/OnvifLib](https://github.com/treealarm/OnvifLib) — issues and pull requests welcome.
+**OnvifLib** is a modern .NET 10 library for ONVIF IP cameras — discovery, PTZ, media URIs, events, analytics, Profile G, and Device I/O.
 
-🖥 **Desktop GUI — ONVIF Device Manager alternative (Windows & Linux):**
-[Releases](https://github.com/treealarm/OnvifLib/releases) — live H.264/HEVC via bundled ffmpeg, PTZ, Profile G/M, multi-camera.
-Windows: prefer the **MSI** (WiX) or portable zip; Linux: zip. Details: [`samples/OnvifLib.Gui`](samples/OnvifLib.Gui).
+**OnvifLib.Gui** is the desktop companion: a cross-platform **ONVIF Device Manager alternative** for Windows and Linux, with live **H.264 / HEVC** playback (bundled ffmpeg), multi-camera tabs, and a full service test bench.
 
----
-
-## 🚀 Features
-
-- 🔍 Device discovery and information
-- 🎥 Media profile and RTSP URI retrieval
-- 🕹️ PTZ (Pan-Tilt-Zoom) camera control
-- 📡 Event handling (PullPoint or Subscription)
-- 🧠 Analytics (ver20): analytics modules and rules, metadata configuration (Profile M)
-- 🎞️ Profile G: the camera's own recordings — search, replay and recording jobs
-- 🔌 Device I/O: relay outputs and digital inputs
-- 🔐 WS-Security (UsernameToken) support
-- ✅ Targets .NET 10
+<p align="center">
+  <a href="https://github.com/treealarm/OnvifLib/releases"><b>Download GUI</b></a>
+  ·
+  <a href="samples/OnvifLib.Gui"><b>GUI docs</b></a>
+  ·
+  <a href="https://www.nuget.org/packages/OnvifLib"><b>NuGet</b></a>
+</p>
 
 ---
 
-## 📦 Installation
+## Why OnvifLib.Gui
+
+Classic [ONVIF Device Manager](https://sourceforge.net/projects/onvifdm/) is Windows-only and often stalls on modern codecs. This stack is different:
+
+| | ODM | OnvifLib.Gui |
+|---|---|---|
+| Platforms | Windows | **Windows + Linux** |
+| Live video | Limited (HEVC often missing) | **H.264 / HEVC** via ffmpeg |
+| Install | Aging installer | **WiX MSI** + portable zip |
+| Profiles | Weak G/M on many builds | Profile G archive + Profile M / analytics |
+| Stack | Legacy player era | .NET 10 + Avalonia |
+
+Windows: prefer the MSI from [Releases](https://github.com/treealarm/OnvifLib/releases) (Program Files, no Mark-of-the-Web). Linux: zip. After winget merges: `winget install treealarm.OnvifLib.Gui`.
+
+---
+
+## Library features
+
+- Device discovery (WS-Discovery) and device information  
+- Media profiles and RTSP / snapshot URIs  
+- PTZ continuous, relative, absolute, presets  
+- Events (PullPoint / subscription)  
+- Analytics (ver20) and metadata configuration (Profile M)  
+- Profile G: search, replay, recording jobs  
+- Device I/O: relays and digital inputs  
+- WS-Security UsernameToken  
+- Target: **.NET 10**
+
+---
+
+## Install (library)
 
 ```bash
 dotnet add package OnvifLib
@@ -36,7 +63,7 @@ dotnet add package OnvifLib
 
 ---
 
-## ⚡ Quick start
+## Quick start
 
 ```csharp
 using OnvifLib;
@@ -93,24 +120,20 @@ foreach (var device in result.Devices)
 
 ---
 
-## 🧪 Samples
-
-Two runnable applications live in [`samples/`](samples), both referencing the library directly:
+## Samples
 
 | | |
 |---|---|
-| [**OnvifLib.Probe**](samples/OnvifLib.Probe) | A console harness that walks the whole public API against a camera and prints OK/FAIL/SKIP per call, with a summary and an exit code. Read-only by default; `--allow-writes` adds writes that undo themselves. Good as a smoke test and as a way to find out what a camera actually supports. |
-| [**OnvifLib.Gui**](samples/OnvifLib.Gui) | A cross-platform **ONVIF Device Manager alternative** (Windows and Linux): camera list with snapshots, WS-Discovery, in-window live video via ffmpeg (**H.264 / HEVC**), and a tab per service (device, media, PTZ, imaging, events, analytics, Profile G, device I/O) plus a SOAP log. Several cameras can stay connected; the tabs follow the selected one. Prebuilt MSI / zips: [Releases](https://github.com/treealarm/OnvifLib/releases). WiX project: [`OnvifLib.Gui.Setup`](samples/OnvifLib.Gui.Setup). |
+| [**OnvifLib.Probe**](samples/OnvifLib.Probe) | Console harness over the public API — OK/FAIL/SKIP, exit code, optional `--allow-writes`. |
+| [**OnvifLib.Gui**](samples/OnvifLib.Gui) | Desktop ODM alternative: discovery, live video, PTZ, imaging, events, analytics, Profile G, Device I/O, SOAP log. [Releases](https://github.com/treealarm/OnvifLib/releases) · [WiX setup](samples/OnvifLib.Gui.Setup). |
 
 ```bash
 dotnet run --project samples/OnvifLib.Probe -- --discovery
 dotnet run --project samples/OnvifLib.Gui
 ```
 
-In VS Code, press **F5** and pick a configuration — the GUI, its self-test, or the probe with
-prompts for the address and credentials. In Visual Studio, set either sample as the startup
-project and pick a launch profile.
+In VS Code, press **F5** and pick a configuration. In Visual Studio, set either sample as startup.
 
 > **Note:** do not enable trimming or NativeAOT in a consuming application.
-> `System.ServiceModel.*` builds its channels, serializers and generated proxies by reflection
-> with no trim annotations, so a trimmed build launches and then fails on the first SOAP call.
+> `System.ServiceModel.*` builds channels, serializers and proxies by reflection with no trim
+> annotations — a trimmed build launches and then fails on the first SOAP call.

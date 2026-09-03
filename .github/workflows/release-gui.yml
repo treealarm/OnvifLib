@@ -232,4 +232,4 @@ jobs:
             ### Notes
             - Linux needs a desktop session (X11/Wayland).
             - App is MIT; bundled `ffmpeg` is LGPL — see `ffmpeg/README.txt`.
-            - winget / Scoop manifests: `packaging/` in the repo.
+            - winget manifests: `packaging/winget` in the repo.

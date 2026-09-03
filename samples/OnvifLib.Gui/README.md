@@ -1,15 +1,32 @@
 # OnvifLib.Gui
 
+<p align="center">
+  <img src="../../docs/images/onviflib-banner.jpg" alt="OnvifLib.Gui" width="100%">
+</p>
+
+<p align="center">
+  <img src="../../icon.png" alt="" width="64">
+</p>
+
+# OnvifLib.Gui
+
 **A modern ONVIF Device Manager (ODM) alternative for Windows and Linux.**
 
-Live video (including **H.264 and HEVC/H.265** via bundled ffmpeg), PTZ, imaging, events,
-analytics, Profile G archive replay, and Device I/O — in one Avalonia desktop app built on
+Live **H.264 and HEVC/H.265** (bundled ffmpeg), PTZ, imaging, events, analytics,
+Profile G archive replay, and Device I/O — Avalonia desktop app on
 [OnvifLib](../../README.md).
 
+<p align="center">
+  <a href="https://github.com/treealarm/OnvifLib/releases"><b>⬇ Download releases</b></a>
+  ·
+  <a href="../OnvifLib.Gui.Setup"><b>WiX MSI</b></a>
+  ·
+  <a href="../../packaging/winget"><b>winget</b></a>
+</p>
+
 Classic [ONVIF Device Manager](https://sourceforge.net/projects/onvifdm/) is Windows-only and
-shows age on codecs and Profile G/M. This app is cross-platform, ships a current LGPL ffmpeg in
-the release zip, and still works as a full ONVIF test bench (including operations ODM-style tools
-often skip).
+shows age on codecs and Profile G/M. This app is cross-platform, ships current LGPL ffmpeg,
+and still works as a full ONVIF test bench.
 
 Where [OnvifLib.Probe](../OnvifLib.Probe/README.md) answers “does this camera work” in one
 non-interactive run, this answers “what does this camera do when I poke it”.
@@ -40,7 +57,7 @@ dotnet run --project samples/OnvifLib.Gui
 |---|---|---|
 | Platforms | Windows | **Windows and Linux** |
 | Live codecs | Limited (HEVC often missing) | **H.264 / HEVC via ffmpeg** |
-| Install | Classic installer ecosystem | **WiX MSI** + portable zip ([winget](../../packaging/winget), Scoop) |
+| Install | Classic installer ecosystem | **WiX MSI** + portable zip ([winget](../../packaging/winget)) |
 | Profile G / M | Weak or absent on many builds | Search, archive replay, metadata/analytics configs |
 | Multi-camera | One context at a time in practice | Several connected; tabs follow the **selected** row |
 | Stack | Aging .NET / DirectShow-era player | .NET 10 + Avalonia + current ffmpeg |

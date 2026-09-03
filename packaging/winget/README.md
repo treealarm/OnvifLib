@@ -37,5 +37,5 @@ wingetcreate update treealarm.OnvifLib.Gui -u <msi-url> -v 1.3.0 --submit
 3. Set `InstallerSha256` (uppercase) from the GitHub API `assets[].digest` or `Get-FileHash`.
 4. Update `ReleaseDate` / `ReleaseNotesUrl`.
 
-Portable zip installs belong in Scoop (`packaging/scoop`). There is no second Windows
+Portable zip is still on Releases for side-by-side copies. There is no second Windows
 installer (no Inno/NSIS) — only the WiX MSI plus the portable zip.
