@@ -15,7 +15,11 @@ winget install --manifest packaging\winget
 ## Submit
 
 1. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs).
-2. Copy the three YAML files into `manifests/t/treealarm/OnvifLib.Gui/1.2.0/`.
+2. Copy the three YAML files into:
+
+   `manifests/t/treealarm/OnvifLib/Gui/1.2.0/`
+
+   (PackageIdentifier `treealarm.OnvifLib.Gui` → one folder per dotted segment after the publisher.)
 3. Open a PR.
 
 Or with [wingetcreate](https://github.com/microsoft/winget-create):
