@@ -68,9 +68,9 @@ HEVC main stream — when you need it.
 ## Using it
 
 **Discover** fills the list via WS-Discovery. **Add** takes an address and port. Selecting a camera
-connects it; **Connect** does the same for the already-selected row. Device list, last address, and
-video prefs go to `settings.json`. A password is stored only if you tick **Remember** (clear text —
-off by default).
+connects it; **Connect** does the same for the already-selected row. Device list, last address,
+video prefs, and **Theme** (Light / Dark) go to `settings.json`. A password is stored only if you
+tick **Remember** (clear text — off by default).
 
 A tab the camera cannot support still opens and says so, rather than disappearing.
 

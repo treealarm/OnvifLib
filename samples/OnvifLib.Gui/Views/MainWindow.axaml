@@ -26,6 +26,11 @@
         <CheckBox IsChecked="{Binding AutoPlayLive}" Content="Auto-play live"
                   VerticalAlignment="Center"
                   ToolTip.Tip="Start in-window video (substream) when a connected device is selected." />
+
+        <TextBlock Text="Theme" VerticalAlignment="Center" Margin="8,0,0,0" />
+        <ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding Theme}"
+                  Width="96" VerticalAlignment="Center"
+                  ToolTip.Tip="Fluent Light or Dark. Saved in settings.json." />
       </StackPanel>
     </Border>
 

@@ -28,6 +28,9 @@ public sealed class AppSettings
   public int VideoFps { get; set; } = 12;
   public bool AutoPlayLive { get; set; } = true;
 
+  /// <summary>"Light" or "Dark". Applied to <c>Application.RequestedThemeVariant</c>.</summary>
+  public string Theme { get; set; } = "Light";
+
   public List<SavedDevice> Devices { get; set; } = [];
 
   [JsonIgnore]
@@ -82,6 +85,7 @@ public sealed class AppSettings
     VideoHeight = VideoHeight,
     VideoFps = VideoFps,
     AutoPlayLive = AutoPlayLive,
+    Theme = Theme,
     Devices = Devices.Select(d => new SavedDevice
     {
       Ip = d.Ip,

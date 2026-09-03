@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using OnvifLib.Gui.Infrastructure;
 using OnvifLib.Gui.Models;
@@ -23,6 +25,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     _timeoutSeconds = settings.TimeoutSeconds;
     _captureSoap = settings.CaptureSoap;
     _autoPlayLive = settings.AutoPlayLive;
+    _theme = NormalizeTheme(settings.Theme);
+    ApplyTheme(_theme);
 
     Video = new VideoPlayerViewModel(Runner)
     {
@@ -107,6 +111,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
   [ObservableProperty] private double _timeoutSeconds = 15;
   [ObservableProperty] private bool _autoPlayLive = true;
 
+  /// <summary>Fluent Light / Dark. Persisted in settings.json.</summary>
+  [ObservableProperty] private string _theme = "Light";
+
+  public IReadOnlyList<string> ThemeOptions { get; } = ["Light", "Dark"];
+
   /// <summary>
   /// Passing a logger to Camera.Create is what switches on the SOAP request/response dump inside
   /// CustomMessageInspector, and it cannot be changed afterwards — hence "requires a reconnect".
@@ -136,6 +145,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
   public string? User => Devices.User;
   public string? Password => Devices.Password;
 
+  partial void OnThemeChanged(string value)
+  {
+    var normalized = NormalizeTheme(value);
+    if (!string.Equals(normalized, value, StringComparison.Ordinal))
+    {
+      Theme = normalized;
+      return;
+    }
+
+    ApplyTheme(normalized);
+    if (!_restoring) SaveSettings();
+  }
+
+  private static string NormalizeTheme(string? theme) =>
+    string.Equals(theme, "Dark", StringComparison.OrdinalIgnoreCase) ? "Dark" : "Light";
+
+  private static void ApplyTheme(string theme)
+  {
+    if (Application.Current is null) return;
+    Application.Current.RequestedThemeVariant =
+      theme == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
+  }
+
   public void SaveSettings()
   {
     Devices.ApplyFieldsToSelected();
@@ -153,6 +185,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
       VideoHeight = Video.FrameHeight,
       VideoFps = Video.FrameRate,
       AutoPlayLive = AutoPlayLive,
+      Theme = Theme,
       Devices = Devices.Snapshot().ToList(),
     }.Save();
 
