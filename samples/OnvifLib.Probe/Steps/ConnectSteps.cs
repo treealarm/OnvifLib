@@ -37,7 +37,7 @@ public static class ConnectSteps
       ("events", c.HasEvents),
       ("digital inputs", c.HasDigitalInputs),
       ("edge recording", c.HasEdgeRecording),
-      ("analytics", c.HasAnalytics)));
+      ("analytics", c.HasAnalyticsService)));
     if (caps is not null) ctx.Capabilities = caps;
 
     await ResolveServicesAsync(ctx);

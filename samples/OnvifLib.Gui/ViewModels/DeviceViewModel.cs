@@ -57,7 +57,7 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
     HasEvents = session.Capabilities.HasEvents;
     HasDigitalInputs = session.Capabilities.HasDigitalInputs;
     HasEdgeRecording = session.Capabilities.HasEdgeRecording;
-    HasAnalytics = session.Capabilities.HasAnalytics;
+    HasAnalytics = session.Capabilities.HasAnalyticsService;
 
     ClockText = DescribeOffset(session.ClockOffset);
     AliveText = "connected";

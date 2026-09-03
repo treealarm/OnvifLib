@@ -57,7 +57,7 @@ namespace OnvifLib
     string SerialNumber,
     string HardwareId);
 
-  public record OnvifCapabilities(bool HasPtz, bool HasImaging, bool HasEvents, bool HasDigitalInputs, bool HasEdgeRecording, bool HasAnalytics);
+  public record OnvifCapabilities(bool HasPtz, bool HasImaging, bool HasEvents, bool HasDigitalInputs, bool HasEdgeRecording, bool HasAnalyticsService);
 
   /// <summary>
   /// A camera's MetadataConfiguration. <c>Analytics</c> is the flag that decides whether the

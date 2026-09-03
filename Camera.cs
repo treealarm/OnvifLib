@@ -474,7 +474,7 @@ public class Camera
       HasEdgeRecording: services.ContainsKey(SearchService.WSDL_V10) && services.ContainsKey(ReplayService.WSDL_V10),
       // Same reasoning as Device I/O: the analytics service is a separate optional ONVIF service,
       // so advertising the namespace means the camera really runs an analytics engine.
-      HasAnalytics: services.ContainsKey(AnalyticsService.WSDL_V20));
+      HasAnalyticsService: services.ContainsKey(AnalyticsService.WSDL_V20));
 
     _capabilitiesCache = result;
     _capabilitiesCacheAt = System.DateTime.UtcNow;
