@@ -87,7 +87,7 @@ $outDir = Join-Path $DestinationDir 'ffmpeg'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Copy-Item -LiteralPath $exe.FullName -Destination (Join-Path $outDir 'ffmpeg.exe')
 @(
-  'Bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds (n7.1.x).'
+  'Bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds (n8.1.x).'
   'Source and licenses: https://github.com/BtbN/FFmpeg-Builds'
   'The OnvifLib.Gui app itself is MIT; this binary is LGPL.'
 ) | Set-Content -LiteralPath (Join-Path $outDir 'README.txt') -Encoding utf8

@@ -22,14 +22,14 @@ jobs:
         include:
           - rid: linux-x64
             runs_on: ubuntu-latest
-            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz
-            ffmpeg_sha: 2fc7aa2eb6e75807170a34fec11af8eea3bc39875cf001d26eabc1605de99a87
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-linux64-lgpl-8.1.tar.xz
+            ffmpeg_sha: f179c8a7ea16ad8b79c188ff7d0d0ffd3a6e253614e54fcc4981e69442ca8d10
             ffmpeg_archive: ffmpeg-linux64-lgpl.tar.xz
             ffmpeg_bin: ffmpeg
           - rid: win-x64
             runs_on: ubuntu-latest
-            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-win64-lgpl-7.1.zip
-            ffmpeg_sha: 8fdbe7f03b64134fecf26166a22d4b4f5be0756901461d01fe5ad7dbc03b5ce7
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-win64-lgpl-8.1.zip
+            ffmpeg_sha: 933b9625fb4b0dc2e1e96cf20fb54b94ed24ba561858418de29531fb7c88ad74
             ffmpeg_archive: ffmpeg-win64-lgpl.zip
             ffmpeg_bin: ffmpeg.exe
 
@@ -75,7 +75,7 @@ jobs:
           cp "$BIN" "$OUT/ffmpeg/${{ matrix.ffmpeg_bin }}"
           chmod +x "$OUT/ffmpeg/${{ matrix.ffmpeg_bin }}" || true
           cat > "$OUT/ffmpeg/README.txt" <<'EOF'
-          Bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds (n7.1.x).
+          Bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds (n8.1.x).
           Source and licenses: https://github.com/BtbN/FFmpeg-Builds
           The OnvifLib.Gui app itself is MIT; this binary is LGPL.
           EOF
@@ -215,7 +215,7 @@ jobs:
             - **OnvifLib.Gui-win-x64.zip** — Windows x64 portable (same payload; no separate installer)
             - **OnvifLib.Gui-linux-x64.zip** — Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
 
-            Bundled ffmpeg (BtbN n7.1.x) lives under `ffmpeg/` next to the app.
+            Bundled ffmpeg (BtbN n8.1.x) lives under `ffmpeg/` next to the app.
 
             ### Run (Windows)
             Install `OnvifLib.Gui-win-x64.msi`, or unzip the portable zip and run `OnvifLib.Gui.exe`.

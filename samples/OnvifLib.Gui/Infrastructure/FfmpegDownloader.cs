@@ -10,17 +10,17 @@ namespace OnvifLib.Gui.Infrastructure;
 /// </summary>
 public static class FfmpegDownloader
 {
-  // Dated BtbN autobuild, LGPL (not GPL), n7.1.x. SHA256 is of the archive, not the extracted binary.
+  // Dated BtbN autobuild, LGPL (not GPL), n8.1.x — not 9.x, which drops the -vsync option FfmpegVideoSource passes. SHA256 is of the archive, not the extracted binary.
   // Windows URL/SHA must match samples/OnvifLib.Gui/ffmpeg.props (MSI + win-x64 publish).
   private static readonly Build LinuxX64 = new(
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz",
-    "2fc7aa2eb6e75807170a34fec11af8eea3bc39875cf001d26eabc1605de99a87",
-    "ffmpeg-n7.1.5-12-g1fdbca85aa-linux64-lgpl-7.1.tar.xz");
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-linux64-lgpl-8.1.tar.xz",
+    "f179c8a7ea16ad8b79c188ff7d0d0ffd3a6e253614e54fcc4981e69442ca8d10",
+    "ffmpeg-n8.1.3-linux64-lgpl-8.1.tar.xz");
 
   private static readonly Build WindowsX64 = new(
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-12-13-15/ffmpeg-n7.1.5-12-g1fdbca85aa-win64-lgpl-7.1.zip",
-    "8fdbe7f03b64134fecf26166a22d4b4f5be0756901461d01fe5ad7dbc03b5ce7",
-    "ffmpeg-n7.1.5-12-g1fdbca85aa-win64-lgpl-7.1.zip");
+    "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-win64-lgpl-8.1.zip",
+    "933b9625fb4b0dc2e1e96cf20fb54b94ed24ba561858418de29531fb7c88ad74",
+    "ffmpeg-n8.1.3-win64-lgpl-8.1.zip");
 
   public static bool IsCurrentRidSupported =>
     (OperatingSystem.IsWindows() || OperatingSystem.IsLinux())
