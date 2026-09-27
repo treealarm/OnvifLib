@@ -3,7 +3,7 @@
 Manifests for [winget-pkgs](https://github.com/microsoft/winget-pkgs) using the **WiX MSI**
 from GitHub Releases (`InstallerType: wix`). Built by [`samples/OnvifLib.Gui.Setup`](../../samples/OnvifLib.Gui.Setup).
 
-Current package: **treealarm.OnvifLib.Gui** `1.2.0` → tag `gui-1.2.0` → `OnvifLib.Gui-win-x64.msi`.
+Current package: **treealarm.OnvifLib.Gui** `1.2.1` → tag `gui-1.2.1` → `OnvifLib.Gui-win-x64.msi`.
 
 ## Validate on Windows
 
@@ -17,7 +17,7 @@ winget install --manifest packaging\winget
 1. Fork [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs).
 2. Copy the three YAML files into:
 
-   `manifests/t/treealarm/OnvifLib/Gui/1.2.0/`
+   `manifests/t/treealarm/OnvifLib/Gui/1.2.1/`
 
    (PackageIdentifier `treealarm.OnvifLib.Gui` → one folder per dotted segment after the publisher.)
 3. Open a PR.
@@ -25,7 +25,7 @@ winget install --manifest packaging\winget
 Or with [wingetcreate](https://github.com/microsoft/winget-create):
 
 ```powershell
-wingetcreate new https://github.com/treealarm/OnvifLib/releases/download/gui-1.2.0/OnvifLib.Gui-win-x64.msi
+wingetcreate new https://github.com/treealarm/OnvifLib/releases/download/gui-1.2.1/OnvifLib.Gui-win-x64.msi
 # later:
 wingetcreate update treealarm.OnvifLib.Gui -u <msi-url> -v 1.3.0 --submit
 ```
