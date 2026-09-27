@@ -8,6 +8,7 @@ PublisherSupportUrl: https://github.com/treealarm/OnvifLib/issues
 Author: treealarm
 PackageName: OnvifLib.Gui
 PackageUrl: https://github.com/treealarm/OnvifLib
+PrivacyUrl: https://github.com/treealarm/OnvifLib/blob/main/PRIVACY.md
 License: MIT
 LicenseUrl: https://github.com/treealarm/OnvifLib/blob/main/LICENSE
 Copyright: Copyright (c) 2025 treealarm

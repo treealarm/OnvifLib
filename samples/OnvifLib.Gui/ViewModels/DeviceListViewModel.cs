@@ -59,6 +59,14 @@ public sealed partial class DeviceListViewModel : ObservableObject
 
   public bool HasSelection => Selected is not null;
 
+  public bool CanRememberPassword => CredentialProtector.IsAvailable;
+
+  public string RememberPasswordHint => CredentialProtector.IsAvailable
+    ? OperatingSystem.IsWindows()
+      ? "Keeps this device's password encrypted with Windows DPAPI (your account only). Off by default."
+      : "Keeps this device's password encrypted with a key held in your desktop keyring. Off by default."
+    : CredentialProtector.UnavailableReason;
+
   public string EditorTitle => Selected is { } device
     ? $"Selected — {device.DisplayName}"
     : "No camera selected — Add or Discover first";

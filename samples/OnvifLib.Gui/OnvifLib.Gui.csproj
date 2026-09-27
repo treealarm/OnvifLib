@@ -53,6 +53,9 @@
     <!-- F12 inspector; Debug only so the Release output stays lean. -->
     <PackageReference Include="Avalonia.Diagnostics" Version="$(AvaloniaVersion)" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <!-- Windows DPAPI for remembered camera passwords (Infrastructure/CredentialProtector). Only
+         called behind OperatingSystem.IsWindows(); Linux uses the desktop keyring instead. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
 
     <!-- Avalonia.X11 asks for 0.21.2, which NuGet audit flags as a high-severity advisory
          (GHSA-xrw6-gwf8-vvr9: a malicious D-Bus peer can spoof signals and exhaust file

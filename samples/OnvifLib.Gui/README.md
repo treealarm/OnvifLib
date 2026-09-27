@@ -70,7 +70,9 @@ HEVC main stream — when you need it.
 **Discover** fills the list via WS-Discovery. **Add** takes an address and port. Selecting a camera
 connects it; **Connect** does the same for the already-selected row. Device list, last address,
 video prefs, and **Theme** (Light / Dark) go to `settings.json`. A password is stored only if you
-tick **Remember** (clear text — off by default).
+tick **Remember** (off by default), and then encrypted — DPAPI on Windows, a key in the desktop
+keyring via `secret-tool` on Linux; without a keyring the option is disabled. See
+[PRIVACY.md](../../PRIVACY.md).
 
 A tab the camera cannot support still opens and says so, rather than disappearing.
 
