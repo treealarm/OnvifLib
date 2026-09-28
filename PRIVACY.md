@@ -121,3 +121,6 @@ Changes to this policy are made in this file and can be seen in its
 ## Contact
 
 Questions or concerns: open an issue at <https://github.com/treealarm/OnvifLib/issues>.
+
+Security problems, such as a password leak: please report them privately as described in
+[SECURITY.md](SECURITY.md), not in a public issue.
