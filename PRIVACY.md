@@ -44,8 +44,9 @@ is gone when the app closes.
 - **Windows:** encrypted with the Windows Data Protection API (DPAPI), current-user scope. Only
   your Windows account on the same computer can decrypt it.
 - **Linux:** encrypted with AES-256-GCM. The key is random, is created on first use and is stored in
-  your desktop keyring (Secret Service — GNOME Keyring, KWallet and similar) through `secret-tool`.
-- **If no such secure store is available** (for example `secret-tool` is not installed), the
+  your desktop keyring (Secret Service — GNOME Keyring, KWallet and similar), which the app reaches
+  over the session D-Bus. Nothing extra needs to be installed.
+- **If no such secure store is available** (for example in a session without a keyring daemon), the
   "Remember password" option is disabled and passwords are never saved.
 
 Versions up to and including 1.2.0 saved remembered passwords in clear text. Newer versions
@@ -78,7 +79,8 @@ To delete your data:
   are removed from `settings.json`.
 - **One remembered password:** untick **Remember password** for that camera.
 - **Everything:** close the app and delete the `OnvifLib.Gui` folder(s) listed above. On Linux,
-  also run `secret-tool clear service OnvifLib.Gui key settings-encryption`.
+  also remove the keyring entry listed above with your keyring manager (Passwords and Keys,
+  KWalletManager) or with `secret-tool clear service OnvifLib.Gui key settings-encryption`.
 
 Uninstalling the app (MSI, winget, or deleting the portable folder) removes the program but, like
 most Windows and Linux desktop apps, leaves your per-user settings in place. Delete them as above.

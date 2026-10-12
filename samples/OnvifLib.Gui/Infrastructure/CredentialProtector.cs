@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -10,9 +9,9 @@ namespace OnvifLib.Gui.Infrastructure;
 /// </summary>
 /// <remarks>
 /// Windows: DPAPI, current-user scope — only the same Windows account on the same machine can
-/// decrypt. Linux: AES-256-GCM with a random key kept in the desktop keyring (Secret Service,
-/// via <c>secret-tool</c> from libsecret). Where neither is available, <see cref="IsAvailable"/>
-/// is false and passwords are simply not persisted.
+/// decrypt. Linux: AES-256-GCM with a random key kept in the desktop keyring (Secret Service over
+/// D-Bus, see <see cref="SecretServiceKeyring"/>). Where neither is available,
+/// <see cref="IsAvailable"/> is false and passwords are simply not persisted.
 /// </remarks>
 public static class CredentialProtector
 {
@@ -23,16 +22,23 @@ public static class CredentialProtector
   // it with a plain Unprotect call.
   private static readonly byte[] DpapiEntropy = "OnvifLib.Gui/remembered-password/v1"u8.ToArray();
 
-  private static readonly string[] KeyringAttributes = ["service", "OnvifLib.Gui", "key", "settings-encryption"];
+  private const string KeyringLabel = "OnvifLib.Gui settings encryption key";
+  private static readonly Dictionary<string, string> KeyringAttributes = new()
+  {
+    ["service"] = "OnvifLib.Gui",
+    ["key"] = "settings-encryption",
+  };
 
-  private static readonly Lazy<string?> SecretTool = new(() => ExecutableSearch.Find("secret-tool"));
+  // One bus round trip, made the first time the option is shown; its answer does not change
+  // while the app runs.
+  private static readonly Lazy<bool> KeyringAvailable = new(SecretServiceKeyring.IsAvailable);
   private static readonly object KeyLock = new();
   private static byte[]? _keyringKey;
 
-  public static bool IsAvailable => OperatingSystem.IsWindows() || (OperatingSystem.IsLinux() && SecretTool.Value is not null);
+  public static bool IsAvailable => OperatingSystem.IsWindows() || KeyringAvailable.Value;
 
   public static string UnavailableReason => OperatingSystem.IsLinux()
-    ? "Remembering passwords needs secret-tool (libsecret-tools) and a running keyring."
+    ? "Remembering passwords needs a desktop keyring (GNOME Keyring, KWallet) on the session bus."
     : "Remembering passwords is not supported on this platform.";
 
   /// <summary>Null when the password is empty or cannot be protected; never returns clear text.</summary>
@@ -101,16 +107,14 @@ public static class CredentialProtector
     lock (KeyLock)
     {
       if (_keyringKey is not null) return _keyringKey;
-      if (SecretTool.Value is not { } tool) return null;
+      if (!KeyringAvailable.Value) return null;
 
-      var (ok, output) = RunSecretTool(tool, ["lookup", .. KeyringAttributes], stdin: null);
-      if (ok && TryDecodeKey(output) is { } existing) return _keyringKey = existing;
+      if (SecretServiceKeyring.Lookup(KeyringAttributes) is { } stored && TryDecodeKey(stored) is { } existing)
+        return _keyringKey = existing;
       if (!create) return null;
 
       var fresh = RandomNumberGenerator.GetBytes(32);
-      var (stored, _) = RunSecretTool(tool, ["store", "--label=OnvifLib.Gui settings encryption key", .. KeyringAttributes],
-        stdin: Convert.ToBase64String(fresh));
-      return stored ? _keyringKey = fresh : null;
+      return SecretServiceKeyring.Store(KeyringLabel, KeyringAttributes, Convert.ToBase64String(fresh)) ? _keyringKey = fresh : null;
     }
   }
 
@@ -124,45 +128,6 @@ public static class CredentialProtector
     catch (FormatException)
     {
       return null;
-    }
-  }
-
-  private static (bool Ok, string Output) RunSecretTool(string tool, IEnumerable<string> arguments, string? stdin)
-  {
-    var start = new ProcessStartInfo(tool)
-    {
-      UseShellExecute = false,
-      CreateNoWindow = true,
-      RedirectStandardInput = true,
-      RedirectStandardOutput = true,
-      RedirectStandardError = true,
-    };
-    foreach (var argument in arguments) start.ArgumentList.Add(argument);
-
-    try
-    {
-      using var process = Process.Start(start);
-      if (process is null) return (false, "");
-
-      // The secret goes over stdin, never the command line, where other processes could read it.
-      if (stdin is not null) process.StandardInput.Write(stdin);
-      process.StandardInput.Close();
-
-      var output = process.StandardOutput.ReadToEndAsync();
-      _ = process.StandardError.ReadToEndAsync();
-
-      // Generous: a locked keyring shows an unlock prompt and waits for the user to type.
-      if (!process.WaitForExit(TimeSpan.FromMinutes(2)))
-      {
-        try { process.Kill(); } catch (Exception) { /* already gone */ }
-        return (false, "");
-      }
-
-      return (process.ExitCode == 0, output.Result);
-    }
-    catch (Exception)
-    {
-      return (false, "");
     }
   }
 }

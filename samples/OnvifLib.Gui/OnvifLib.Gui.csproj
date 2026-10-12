@@ -57,11 +57,10 @@
          called behind OperatingSystem.IsWindows(); Linux uses the desktop keyring instead. -->
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
 
-    <!-- Avalonia.X11 asks for 0.21.2, which NuGet audit flags as a high-severity advisory
-         (GHSA-xrw6-gwf8-vvr9: a malicious D-Bus peer can spoof signals and exhaust file
-         descriptors). 0.21.3 is the patch for that line — a direct reference is the only way to
-         lift a transitive dependency. Drop this line once Avalonia asks for it itself.
-         Same technique the library uses for System.Security.Cryptography.Xml. -->
+    <!-- Used directly: Infrastructure/SecretServiceKeyring talks to the Linux desktop keyring over
+         it. Also lifts the transitive version Avalonia.X11 asks for (0.21.2), which NuGet audit
+         flags as a high-severity advisory (GHSA-xrw6-gwf8-vvr9: a malicious D-Bus peer can spoof
+         signals and exhaust file descriptors); 0.21.3 is the patch for that line. -->
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.3" />
   </ItemGroup>
 

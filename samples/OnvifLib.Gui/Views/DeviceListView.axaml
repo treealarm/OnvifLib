@@ -57,7 +57,7 @@
         <CheckBox Grid.Row="12" Grid.Column="1"
                   IsChecked="{Binding RememberPassword}" Content="Remember password"
                   IsEnabled="{Binding CanRememberPassword}"
-                  ToolTip.Tip="{Binding RememberPasswordHint}" />
+                  ToolTip.Tip="{Binding RememberPasswordHint}" ToolTip.ShowOnDisabled="True" />
       </Grid>
 
       <WrapPanel>
