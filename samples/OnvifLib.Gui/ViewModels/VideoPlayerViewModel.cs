@@ -49,7 +49,6 @@ public sealed partial class VideoPlayerViewModel : ObservableObject, IAsyncDispo
   [ObservableProperty] private string _resolvedFfmpegPath = "";
   [ObservableProperty] private string _status = "idle";
   [ObservableProperty] private bool _statusIsError;
-  [ObservableProperty] private bool _isDownloading;
   [ObservableProperty] private double _actualFps;
   [ObservableProperty] private string _stats = "";
 
@@ -106,7 +105,7 @@ public sealed partial class VideoPlayerViewModel : ObservableObject, IAsyncDispo
   [RelayCommand(CanExecute = nameof(CanPlay))]
   private Task PlayAsync() => PlaySelectedAsync();
 
-  private bool CanPlay() => SelectedProfile is not null && !IsPlaying && !IsDownloading;
+  private bool CanPlay() => SelectedProfile is not null && !IsPlaying;
 
   public async Task PlaySelectedAsync()
   {
@@ -147,7 +146,7 @@ public sealed partial class VideoPlayerViewModel : ObservableObject, IAsyncDispo
   {
     await StopInternalAsync().ConfigureAwait(true);
 
-    var ffmpeg = await EnsureFfmpegAsync().ConfigureAwait(true);
+    var ffmpeg = EnsureFfmpeg();
     if (ffmpeg is null) return;
 
     var width = Math.Clamp(FrameWidth, 160, 1920);
@@ -195,37 +194,6 @@ public sealed partial class VideoPlayerViewModel : ObservableObject, IAsyncDispo
     return Task.CompletedTask;
   }
 
-  [RelayCommand]
-  private async Task DownloadFfmpegAsync()
-  {
-    if (IsDownloading) return;
-    if (!FfmpegDownloader.IsCurrentRidSupported)
-    {
-      Report(FfmpegDownloader.UnsupportedRidMessage ?? "download not supported", isError: true);
-      return;
-    }
-
-    IsDownloading = true;
-    PlayCommand.NotifyCanExecuteChanged();
-    try
-    {
-      var progress = new Progress<string>(message => Report(message));
-      var path = await Task.Run(() => FfmpegDownloader.DownloadAsync(progress, CancellationToken.None)).ConfigureAwait(true);
-      CustomFfmpegPath = path;
-      RefreshFfmpegStatus();
-      Report($"downloaded ffmpeg to {path}");
-    }
-    catch (Exception ex)
-    {
-      Report($"ffmpeg download failed: {ex.Message}", isError: true);
-    }
-    finally
-    {
-      IsDownloading = false;
-      PlayCommand.NotifyCanExecuteChanged();
-    }
-  }
-
   public async ValueTask DisposeAsync()
   {
     await StopInternalAsync().ConfigureAwait(true);
@@ -235,20 +203,10 @@ public sealed partial class VideoPlayerViewModel : ObservableObject, IAsyncDispo
     Frame = null;
   }
 
-  private async Task<string?> EnsureFfmpegAsync()
+  private string? EnsureFfmpeg()
   {
     RefreshFfmpegStatus();
     if (ResolvedFfmpegPath is { Length: > 0 } existing) return existing;
-
-    if (!FfmpegDownloader.IsCurrentRidSupported)
-    {
-      Report(FfmpegLocator.DescribeMissing() ?? "ffmpeg not found", isError: true);
-      return null;
-    }
-
-    await DownloadFfmpegAsync().ConfigureAwait(true);
-    RefreshFfmpegStatus();
-    if (ResolvedFfmpegPath is { Length: > 0 } downloaded) return downloaded;
 
     Report(FfmpegLocator.DescribeMissing() ?? "ffmpeg not found", isError: true);
     return null;

@@ -11,8 +11,8 @@ sudo snap connect onviflib-gui:password-manager-service   # for "Remember passwo
 sudo snap connect onviflib-gui:removable-media            # to save snapshots on USB drives
 ```
 
-Settings inside the snap: `~/snap/onviflib-gui/current/.config/OnvifLib.Gui/settings.json`;
-ffmpeg download cache: `~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/`.
+Settings inside the snap: `~/snap/onviflib-gui/current/.config/OnvifLib.Gui/settings.json`.
+ffmpeg is the bundled `$SNAP/app/ffmpeg/ffmpeg`; nothing is downloaded.
 External players (VLC, mpv, ffplay on the host) cannot be launched from the strict snap; in-window
 playback via the bundled ffmpeg is unaffected.
 

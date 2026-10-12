@@ -37,9 +37,6 @@
         <NumericUpDown Value="{Binding FrameRate}" Minimum="1" Maximum="30" Increment="1"
                        FormatString="0" Width="80" Margin="0,0,6,4"
                        ToolTip.Tip="Kept for settings. Decode always takes every frame the camera sends." />
-        <Button Content="Download ffmpeg" Command="{Binding DownloadFfmpegCommand}" Margin="0,0,6,4"
-                IsEnabled="{Binding !IsDownloading}"
-                ToolTip.Tip="Fetches a pinned LGPL ffmpeg build into the app data folder. Not needed if ffmpeg is already on PATH." />
       </WrapPanel>
       <DockPanel>
         <TextBlock DockPanel.Dock="Right" Text="{Binding Stats}" Opacity="0.7" Margin="8,0,0,0"

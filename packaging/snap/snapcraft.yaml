@@ -61,11 +61,10 @@ apps:
     # X11/Wayland/GL libraries, ICU, fonts and themes from the gnome-46-2404 and mesa-2404
     # content snaps, plus the desktop-launch environment: it points XDG_CONFIG_HOME and
     # XDG_DATA_HOME under $SNAP_USER_DATA, so .NET puts settings.json in
-    # ~/snap/onviflib-gui/current/.config/OnvifLib.Gui/ and the ffmpeg cache in
-    # ~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/.
+    # ~/snap/onviflib-gui/current/.config/OnvifLib.Gui/.
     extensions: [gnome]
     plugs:
-      # ONVIF SOAP over HTTP(S), RTSP video, JPEG snapshots, the optional ffmpeg download.
+      # ONVIF SOAP over HTTP(S), RTSP video, JPEG snapshots.
       - network
       # WS-Discovery binds a UDP socket to receive the replies to the multicast probe on 3702.
       - network-bind

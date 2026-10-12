@@ -34,9 +34,9 @@ In scope, for example:
 
 - remembered passwords leaking from `settings.json`, the keyring entry or process memory beyond
   what [PRIVACY.md](PRIVACY.md) describes;
-- the app sending data anywhere other than the cameras and the optional ffmpeg download listed in
+- the app sending data anywhere other than the cameras listed in
   [PRIVACY.md](PRIVACY.md#network-communication);
-- the ffmpeg download or the installer accepting a file whose hash does not match;
+- the installer build accepting an ffmpeg archive whose hash does not match;
 - malformed camera or WS-Discovery replies causing code execution, or a crash that corrupts saved
   settings.
 

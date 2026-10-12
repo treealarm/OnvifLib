@@ -43,8 +43,8 @@ decodes video, and only here.
 | Windows | Prefer **`OnvifLib.Gui-win-x64.msi`** (WiX → Program Files, Start Menu; avoids Mark-of-the-Web on extracted files). Portable: unzip `OnvifLib.Gui-win-x64.zip`. Build notes: [OnvifLib.Gui.Setup](../OnvifLib.Gui.Setup/README.md). winget manifests: [`packaging/winget`](../../packaging/winget). |
 | Linux | **`sudo snap install onviflib-gui`** ([Snap Store](https://snapcraft.io/onviflib-gui): strict confinement, auto-updates, menu entry). Portable: unzip `OnvifLib.Gui-linux-x64.zip` → run `./OnvifLib.Gui` (needs a desktop session). Recipe: [`packaging/snap`](../../packaging/snap). |
 
-No separate .NET or ffmpeg install for in-window playback. ffmpeg is also resolved from `PATH`,
-an app-data cache, or a path you type if you prefer your own build.
+No separate .NET or ffmpeg install for in-window playback. ffmpeg is also resolved from `PATH`
+or a path you type if you prefer your own build.
 
 In the snap, **Remember password** needs the keyring interface, which is not yet auto-connected:
 `sudo snap connect onviflib-gui:password-manager-service`. Until then the option stays disabled
@@ -114,18 +114,17 @@ whatever else that build decodes); the GUI does not reimplement codecs.
 
 ffmpeg is located in this order:
 
-1. **Next to the app** — release zips ship `ffmpeg/ffmpeg` (or `ffmpeg.exe`).
-2. **`PATH`** — if `ffmpeg` is already installed, nothing is downloaded.
-3. **App data cache** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux (snap:
-   `~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/`), `%LocalAppData%\OnvifLib.Gui\ffmpeg\` on Windows.
+1. **Next to the app** — the zips, the MSI and the snap all ship `ffmpeg/ffmpeg` (or `ffmpeg.exe`).
+2. **`PATH`** — an ffmpeg you installed yourself.
+3. **App data folder** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux, `%LocalAppData%\OnvifLib.Gui\ffmpeg\`
+   on Windows. Only versions up to 1.3.1 put a copy there; it is still used if present.
 4. **A path you type** in the player bar (kept in `settings.json`).
-5. **Download** — the **Download ffmpeg** button, and the first **Play** if nothing else was found.
-   That fetches a pinned **LGPL** BtbN build for `win-x64` or `linux-x64`, checks SHA256, and
-   extracts only the `ffmpeg` binary. Other RIDs are told to install ffmpeg themselves
-   (`sudo apt install ffmpeg` on Linux).
 
-The repository and the OnvifLib NuGet package **do not ship ffmpeg** into source control. Release
-zips and the optional download are a separate LGPL program; this sample stays MIT.
+The app never downloads ffmpeg. Running from source without it, install it
+(`sudo apt install ffmpeg`, `winget install ffmpeg`) or type its path.
+
+The repository and the OnvifLib NuGet package **do not ship ffmpeg** into source control. The
+binary in the release packages is a separate LGPL program; this sample stays MIT.
 
 JPEG **snapshots** remain available on the Media tab (polled, never overlapping).
 `MediaService.GetImage()` still has no profile token — it always uses the first profile. The URL

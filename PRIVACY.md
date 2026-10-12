@@ -10,8 +10,8 @@ Last updated: 2026-10-12.
 
 - OnvifLib.Gui has **no telemetry, no analytics, no crash reporting, no accounts and no update
   check**. The developers never receive any data from the app.
-- The app talks **only to the cameras you discover or add**, plus one optional download from GitHub
-  that you start yourself (see [Network communication](#network-communication)).
+- The app talks **only to the cameras you discover or add** (see
+  [Network communication](#network-communication)). It connects to nothing else.
 - Everything it keeps is stored **locally, on your computer, under your user profile**. Camera
   passwords are kept only if you ask for it, and then only in encrypted form.
 
@@ -71,7 +71,7 @@ Please be aware of the following limits, which come from how cameras work rather
 | What | Location |
 |---|---|
 | Settings and device list | Windows: `%APPDATA%\OnvifLib.Gui\settings.json` · Linux: `~/.config/OnvifLib.Gui/settings.json` · Linux snap: `~/snap/onviflib-gui/current/.config/OnvifLib.Gui/settings.json` |
-| Downloaded ffmpeg (only if you use **Download ffmpeg**) | Windows: `%LOCALAPPDATA%\OnvifLib.Gui\ffmpeg\` · Linux: `~/.local/share/OnvifLib.Gui/ffmpeg/` · Linux snap: `~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/` |
+| ffmpeg downloaded by versions up to 1.3.1 (only if you used their **Download ffmpeg** button) | Windows: `%LOCALAPPDATA%\OnvifLib.Gui\ffmpeg\` · Linux: `~/.local/share/OnvifLib.Gui/ffmpeg/` · Linux snap: `~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/` |
 | Linux keyring entry | Secret Service item labelled "OnvifLib.Gui settings encryption key" |
 | Saved snapshots and logs | Only where you chose to save them |
 
@@ -98,16 +98,12 @@ The app makes these connections, and no others:
 2. **Cameras you add or discover** — ONVIF SOAP over HTTP/HTTPS, RTSP video, and JPEG snapshots,
    sent to the address you entered or the camera advertised. Events are fetched by polling
    (pull-point); the app does not open a listening port.
-3. **ffmpeg download (optional)** — only if you click **Download ffmpeg**, the app downloads a
-   pinned LGPL build from `github.com` (BtbN/FFmpeg-Builds) and checks its SHA-256 hash. The Windows
-   installer already includes ffmpeg, so this is normally not needed there. GitHub receives an
-   ordinary download request (your IP address and user agent), subject to
-   [GitHub's privacy statement](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement).
 
 **Does data leave the local network?** Not by the app's own doing. Camera traffic goes wherever the
 camera is: if you add a camera that is reachable over the internet or a VPN, traffic to it crosses
-those networks. The only connection the app makes to anything other than a camera is the optional
-ffmpeg download above.
+those networks. The app makes no connection to anything other than a camera. Versions up to 1.3.1
+also had an optional **Download ffmpeg** button that fetched ffmpeg from `github.com`; it was removed
+because every package already includes ffmpeg.
 
 ## The OnvifLib library
 

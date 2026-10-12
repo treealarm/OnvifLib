@@ -6,8 +6,10 @@ namespace OnvifLib.Gui.Infrastructure;
 /// Resolves the ffmpeg binary used for in-window playback.
 /// </summary>
 /// <remarks>
-/// Order: next to the app (release zips ship one), PATH, a previously downloaded copy under the
-/// app data directory, then a path the user typed. The library NuGet never ships a binary.
+/// Order: next to the app (every release package ships one), PATH, a copy under the app data
+/// directory, then a path the user typed. Nothing is downloaded: versions up to 1.3.1 could fetch
+/// ffmpeg into that directory, and a copy left there is still used. The library NuGet never ships
+/// a binary.
 /// </remarks>
 public static class FfmpegLocator
 {
@@ -54,13 +56,10 @@ public static class FfmpegLocator
   {
     if (Find() is not null) return null;
 
-    if (!FfmpegDownloader.IsCurrentRidSupported)
-    {
-      return OperatingSystem.IsLinux()
-        ? "ffmpeg was not found. Install it with `sudo apt install ffmpeg`, or set a path to an ffmpeg binary."
-        : "ffmpeg was not found. Set a path to an ffmpeg binary, or run on win-x64 / linux-x64 to download one.";
-    }
-
-    return "ffmpeg was not found. Press Download to fetch an LGPL build, install it on PATH, or set a path.";
+    if (OperatingSystem.IsLinux())
+      return "ffmpeg was not found. Install it (sudo apt install ffmpeg), or set the path to an ffmpeg binary.";
+    if (OperatingSystem.IsWindows())
+      return "ffmpeg was not found. Install it (winget install ffmpeg), or set the path to ffmpeg.exe.";
+    return "ffmpeg was not found. Install it on PATH, or set the path to an ffmpeg binary.";
   }
 }
