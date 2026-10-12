@@ -32,6 +32,20 @@ public sealed partial class EventsViewModel(OperationRunner runner, UiLogger log
 
   public string SelectedXml => Selected is { } row ? XmlPretty.Format(row.Xml) : "";
 
+  /// <summary>The topic expression typed into the filter box. Empty means every topic.</summary>
+  [ObservableProperty] private string _topicFilter = "";
+
+  /// <summary>What the subscription is actually filtered on, as the service last reported it.</summary>
+  [ObservableProperty] private string _activeFilterText = "all topics";
+
+  [ObservableProperty] private string _capabilitiesText = "";
+
+  public ObservableCollection<OnvifEventTopic> Topics { get; } = [];
+
+  [ObservableProperty] private OnvifEventTopic? _selectedTopic;
+
+  private bool _topicsLoaded;
+
   [ObservableProperty] private string _parseInput = "";
   [ObservableProperty] private string _parseResult = "";
 
@@ -46,6 +60,83 @@ public sealed partial class EventsViewModel(OperationRunner runner, UiLogger log
     Unsubscribe();
     Events.Clear();
     IsReceiving = false;
+    Topics.Clear();
+    SelectedTopic = null;
+    TopicFilter = "";
+    ActiveFilterText = "all topics";
+    CapabilitiesText = "";
+    _topicsLoaded = false;
+  }
+
+  /// <summary>
+  /// Topics and capabilities are fixed for a camera, so they are read once per connection rather
+  /// than on every visit to the tab.
+  /// </summary>
+  public override async Task ActivateAsync()
+  {
+    if (Session?.Events is null || _topicsLoaded) return;
+    await LoadCapabilitiesAsync();
+    await LoadTopicsAsync();
+  }
+
+  private async Task LoadCapabilitiesAsync()
+  {
+    if (Session?.Events is not { } events) return;
+    var (ok, caps) = await Runner.RunAsync("GetServiceCapabilities (events)", events.GetServiceCapabilitiesAsync);
+    if (!ok) return;
+    CapabilitiesText = caps is null
+      ? "the camera reported no event capabilities"
+      : $"max pull points {(caps.MaxPullPoints == 0 ? "—" : caps.MaxPullPoints)}, " +
+        $"WS subscription policy {(caps.WsSubscriptionPolicySupport ? "yes" : "no")}, " +
+        $"pausable {(caps.WsPausableSubscriptionManagerInterfaceSupport ? "yes" : "no")}";
+  }
+
+  [RelayCommand]
+  private async Task LoadTopicsAsync()
+  {
+    if (Session?.Events is not { } events) return;
+    var (ok, properties) = await Runner.RunAsync("GetEventProperties", events.GetEventPropertiesAsync);
+    if (!ok) return;
+    Topics.Clear();
+    foreach (var topic in properties?.Topics ?? []) Topics.Add(topic);
+    _topicsLoaded = true;
+    if (properties is { Topics.Count: 0 }) Runner.Report("The camera reported no event topics");
+  }
+
+  /// <summary>Copies the selected topic into the filter box, or appends it as an alternative.</summary>
+  [RelayCommand]
+  private void UseTopic()
+  {
+    if (SelectedTopic is not { } topic) return;
+    TopicFilter = string.IsNullOrWhiteSpace(TopicFilter) ? topic.Path : $"{TopicFilter.Trim()}|{topic.Path}";
+  }
+
+  /// <summary>
+  /// Re-subscribes with the typed filter. Works whether or not the list is receiving: the service
+  /// swaps the subscription either way, and a rejected expression leaves the previous one in place.
+  /// </summary>
+  [RelayCommand]
+  private async Task ApplyFilterAsync()
+  {
+    if (Session?.Events is not { } events) return;
+    var expression = string.IsNullOrWhiteSpace(TopicFilter) ? null : TopicFilter.Trim();
+    await Runner.RunAsync(expression is null ? "SetTopicFilter (all topics)" : $"SetTopicFilter [{expression}]",
+      () => events.SetTopicFilterAsync(expression));
+    ActiveFilterText = events.TopicFilter ?? "all topics";
+  }
+
+  [RelayCommand]
+  private void ClearFilter() => TopicFilter = "";
+
+  /// <summary>
+  /// Asks the camera to re-send the current state of every property event, so the list shows
+  /// whether motion is active now instead of waiting for it to change.
+  /// </summary>
+  [RelayCommand]
+  private async Task SyncPointAsync()
+  {
+    if (Session?.Events is not { } events || !IsReceiving) return;
+    await Runner.RunAsync("SetSynchronizationPoint", events.SetSynchronizationPointAsync);
   }
 
   public override async Task ShutdownAsync()

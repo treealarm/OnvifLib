@@ -144,6 +144,7 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     await LoadAudioConfigsAsync();
     await LoadMetadataConfigsAsync();
     await LoadAnalyticsConfigsAsync();
+    await LoadVideoSourcesAsync();
   }
 
   protected override void OnCleared()
@@ -157,6 +158,7 @@ public sealed partial class MediaViewModel : TabViewModelBase, IAsyncDisposable
     AudioOptions.Clear();
     MetadataConfigs.Clear();
     AnalyticsConfigs.Clear();
+    ClearOsd();
     SelectedProfile = null;
     StreamUri = MaskedStreamUri = "";
     SnapshotInfo = "no snapshot yet";

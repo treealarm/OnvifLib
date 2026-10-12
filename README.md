@@ -43,12 +43,14 @@ Windows: prefer the MSI from [Releases](https://github.com/treealarm/OnvifLib/re
 
 ## Library features
 
-- Device discovery (WS-Discovery) and device information  
-- Media profiles and RTSP / snapshot URIs  
-- PTZ continuous, relative, absolute, presets  
-- Events (PullPoint / subscription)  
+- Device discovery (WS-Discovery) and device information; GetCapabilities fallback for ONVIF 1.x/2.0 cameras  
+- Device administration: users, date/time mode and time zone, network interfaces, DNS, NTP, hostname, protocols, gateway, discovery scopes  
+- Media profiles, RTSP / snapshot URIs, video source configurations and OSD  
+- PTZ continuous, relative, absolute, presets, home position, nodes and auxiliary commands  
+- Imaging: picture, day/night (IR cut), exposure, white balance, WDR, BLC, focus configuration and focus moves  
+- Events (PullPoint): topic list, topic filters, synchronization point  
 - Analytics (ver20) and metadata configuration (Profile M)  
-- Profile G: search, replay, recording jobs  
+- Profile G: search (recordings and events), replay, recordings, tracks and recording jobs  
 - Device I/O: relays and digital inputs  
 - WS-Security UsernameToken  
 - Target: **.NET 10**

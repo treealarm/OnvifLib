@@ -20,6 +20,102 @@ public static class MediaSteps
     await VideoEncoderAsync(ctx, media);
     await AudioEncoderAsync(ctx, media);
     await ProfileMAsync(ctx, media);
+    await OsdAsync(ctx, media);
+  }
+
+  /// <summary>
+  /// Video sources and on-screen display. The write test only ever touches an OSD it created
+  /// itself, and deletes it in a finally — the camera's own OSDs are never modified.
+  /// </summary>
+  private static async Task OsdAsync(ProbeContext ctx, MediaService media)
+  {
+    var r = ctx.Runner;
+
+    var configs = await r.StepAsync("GetVideoSourceConfigurations", media.GetVideoSourceConfigurationsAsync,
+      list => r.Table(["token", "name", "source", "bounds", "use count"],
+        list.Select(c => new List<object?> { c.Token, c.Name, c.SourceToken, $"{c.X},{c.Y} {c.Width}x{c.Height}", c.UseCount })));
+
+    await r.StepAsync("GetVideoSources", media.GetVideoSourcesAsync, list =>
+    {
+      r.Table(["token", "fps", "resolution"],
+        list.Select(v => new List<object?> { v.Token, v.Framerate == 0 ? null : v.Framerate, v.Width == 0 ? null : $"{v.Width}x{v.Height}" }));
+      if (list.Count > 0 && list.All(v => v.Framerate == 0))
+        r.Note("derived from the configurations — Media2 has no GetVideoSources, so framerate and size are not known");
+    });
+
+    var osds = await r.StepAsync("GetOSDs", () => media.GetOsdsAsync(),
+      list => r.Table(["token", "config", "type", "text type", "text", "position", "font"],
+        list.Select(o => new List<object?>
+        {
+          o.Token, o.VideoSourceConfigToken, o.Type, o.TextType, o.PlainText,
+          o.PositionType == "Custom" ? $"Custom {o.X:0.##},{o.Y:0.##}" : o.PositionType, o.FontSize,
+        })));
+
+    var configToken = ctx.Profiles.Select(p => p.VideoSourceConfigToken).FirstOrDefault(t => t.Length > 0)
+                      ?? configs?.FirstOrDefault()?.Token;
+    if (configToken is null)
+    {
+      r.Skip("GetOSDOptions", "no video source configuration to ask about");
+      r.Skip("CreateOSD / SetOSD / DeleteOSD", "no video source configuration to attach an OSD to");
+      return;
+    }
+
+    var options = await r.StepAsync($"GetOSDOptions [{configToken}]",
+      async () => await media.GetOsdOptionsAsync(configToken) ?? throw new ProbeFailure("the camera reported no OSD options"),
+      o => r.Values(
+        ("max OSDs", o.MaxTotal),
+        ("max plain text", o.MaxPlainText),
+        ("types", string.Join(", ", o.Types)),
+        ("text types", string.Join(", ", o.TextTypes)),
+        ("positions", string.Join(", ", o.PositionOptions)),
+        ("font size", o.FontSizeMin is null ? null : $"{o.FontSizeMin} … {o.FontSizeMax}"),
+        ("date formats", string.Join(", ", o.DateFormats)),
+        ("time formats", string.Join(", ", o.TimeFormats))));
+
+    const string name = "CreateOSD / SetOSD / DeleteOSD (text, create and delete)";
+    if (!ctx.Options.AllowWrites) { r.SkipWrites(name); return; }
+
+    var existing = osds?.Count(o => o.VideoSourceConfigToken == configToken) ?? 0;
+    var plainCount = osds?.Count(o => o.VideoSourceConfigToken == configToken && o.TextType == "Plain") ?? 0;
+    if (options is null || options.MaxTotal <= existing || options.MaxPlainText is { } maxPlain && maxPlain <= plainCount)
+    {
+      r.Skip(name, "the configuration has no free OSD slot — the probe will not replace one of the camera's own");
+      return;
+    }
+    if (!options.TextTypes.Contains("Plain"))
+    {
+      r.Skip(name, "the camera does not offer plain-text OSDs");
+      return;
+    }
+
+    var text = $"OnvifLibProbe-{DateTime.Now:HHmmss}";
+    var position = options.PositionOptions.FirstOrDefault(p => p != "Custom") ?? "Custom";
+    await r.StepAsync(name, async () =>
+    {
+      var token = await media.CreateOsdAsync(new OnvifOsd("", configToken, "Text",
+        PositionType: position, X: position == "Custom" ? 0f : null, Y: position == "Custom" ? 0f : null,
+        TextType: "Plain", PlainText: text));
+      r.Value("new token", token);
+      try
+      {
+        if (string.IsNullOrEmpty(token))
+          token = (await media.GetOsdsAsync(configToken)).FirstOrDefault(o => o.PlainText == text)?.Token ?? "";
+        var created = (await media.GetOsdsAsync(configToken)).FirstOrDefault(o => o.Token == token)
+          ?? throw new ProbeFailure("the camera accepted CreateOSD but does not list the new OSD");
+        r.Values(("read back text", created.PlainText), ("position", created.PositionType));
+
+        // No-op re-write of our own OSD: proves SetOSD is accepted without choosing new values.
+        await media.SetOsdAsync(created with { });
+      }
+      finally
+      {
+        if (string.IsNullOrEmpty(token))
+          token = (await media.GetOsdsAsync(configToken)).FirstOrDefault(o => o.PlainText == text)?.Token ?? "";
+        if (!string.IsNullOrEmpty(token)) await media.DeleteOsdAsync(token);
+      }
+      if ((await media.GetOsdsAsync(configToken)).Any(o => o.PlainText == text))
+        throw new ProbeFailure("the test OSD is still listed after DeleteOSD");
+    });
   }
 
   private static async Task ProfilesAsync(ProbeContext ctx, MediaService media)
@@ -33,8 +129,8 @@ public static class MediaSteps
     {
       ctx.Profiles.Clear();
       ctx.Profiles.AddRange(profiles);
-      r.Table(["token", "name", "resolution", "encoding", "video source"],
-        profiles.Select(p => new List<object?> { p.Token, p.Name, $"{p.Width}x{p.Height}", p.Encoding, p.VideoSourceToken }));
+      r.Table(["token", "name", "resolution", "encoding", "video source", "video source cfg"],
+        profiles.Select(p => new List<object?> { p.Token, p.Name, $"{p.Width}x{p.Height}", p.Encoding, p.VideoSourceToken, p.VideoSourceConfigToken }));
     });
 
     if (ctx.Profiles.Count == 0)

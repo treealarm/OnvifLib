@@ -54,6 +54,7 @@
 
           <DockPanel Grid.Column="2">
             <TextBlock DockPanel.Dock="Top" Classes="section" Text="Services" Margin="0,0,0,4" />
+            <TextBlock DockPanel.Dock="Top" Classes="hint" Text="{Binding ServicesSource}" Margin="0,0,0,4" />
             <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshServicesCommand}"
                     HorizontalAlignment="Left" Margin="0,0,0,4" />
             <DataGrid ItemsSource="{Binding Services}" IsReadOnly="True" GridLinesVisibility="Horizontal"
@@ -94,14 +95,9 @@
             <TextBlock Classes="section" Text="Destructive operations" Margin="0" />
             <TextBlock Classes="hint" Text="Each action asks for confirmation first." />
             <WrapPanel>
-              <Button Content="Sync clock to this machine" Command="{Binding SyncTimeCommand}" Margin="0,0,8,4" />
               <Button Content="Reboot" Command="{Binding RebootCommand}" Margin="0,0,8,4" />
             </WrapPanel>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <DatePicker SelectedDate="{Binding ManualDate}" />
-              <TimePicker SelectedTime="{Binding ManualTime}" />
-              <Button Content="Set clock" Command="{Binding SetTimeCommand}" />
-            </StackPanel>
+            <TextBlock Classes="hint" Text="Setting the clock has moved to the Date &amp; time page." />
             <StackPanel Orientation="Horizontal" Spacing="8">
               <ComboBox ItemsSource="{Binding AuxiliaryCommands}" SelectedItem="{Binding SelectedAuxiliaryCommand}"
                         Width="240" PlaceholderText="auxiliary command…" />
@@ -110,6 +106,183 @@
             <TextBlock Classes="hint"
                        Text="ONVIF does not define what auxiliary commands do. On many cameras one of them formats the SD card." />
             <SelectableTextBlock Text="{Binding AuxiliaryResponse}" Classes="mono" TextWrapping="Wrap" />
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="Date &amp; time">
+        <StackPanel Spacing="6" Margin="0,4,0,0" MaxWidth="820" HorizontalAlignment="Left">
+          <TextBlock Classes="section" Text="How the camera keeps time" Margin="0" />
+          <SelectableTextBlock Text="{Binding SystemDateTimeText}" TextWrapping="Wrap" />
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+            <TextBlock Grid.Row="0" Text="Mode" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding DateTimeTypes}" SelectedItem="{Binding EditDateTimeType}" Width="160" />
+            <TextBlock Grid.Row="1" Text="Time zone (POSIX)" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditTimeZone}" Classes="mono" Width="360" HorizontalAlignment="Left"
+                     Watermark="CET-1CEST,M3.5.0,M10.5.0/3" />
+            <TextBlock Grid.Row="2" Text="Daylight saving" VerticalAlignment="Center" />
+            <CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding EditDaylightSavings}" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Read" Command="{Binding LoadSystemDateTimeCommand}" />
+            <Button Content="Apply mode, zone and DST" Command="{Binding ApplySystemDateTimeCommand}"
+                    ToolTip.Tip="Keeps the camera's current time; use the buttons below to change the time itself. Asks first." />
+          </StackPanel>
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="The zone is a POSIX TZ string, written as the offset to add to local time to get UTC: CST-3 is UTC+3. NTP mode follows the servers on the Network page." />
+
+          <TextBlock Classes="section" Text="Set the time" Margin="0,10,0,0" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Sync clock to this machine" Command="{Binding SyncTimeCommand}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <DatePicker SelectedDate="{Binding ManualDate}" />
+            <TimePicker SelectedTime="{Binding ManualTime}" />
+            <Button Content="Set clock" Command="{Binding SetTimeCommand}" />
+          </StackPanel>
+          <TextBlock Classes="hint" TextWrapping="Wrap"
+                     Text="Both switch the camera to Manual mode and keep its zone and DST setting. Each asks first." />
+        </StackPanel>
+      </TabItem>
+
+      <TabItem Header="Users">
+        <Grid ColumnDefinitions="*,12,360" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Accounts" Margin="0" VerticalAlignment="Center" />
+              <Button Content="Refresh" Command="{Binding LoadUsersCommand}" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Users}" SelectedItem="{Binding SelectedUser}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="User" Binding="{Binding Username}" Width="*" />
+                <DataGridTextColumn Header="Level" Binding="{Binding Level}" Width="*" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Classes="section" Text="Edit" Margin="0" />
+            <TextBox Text="{Binding EditUsername}" Watermark="user name" />
+            <TextBox Text="{Binding EditPassword}" PasswordChar="•" Watermark="password (blank = unchanged on Update)" />
+            <ComboBox ItemsSource="{Binding UserLevels}" SelectedItem="{Binding EditLevel}" Width="200" />
+            <WrapPanel>
+              <Button Content="Create" Command="{Binding CreateUserCommand}" Margin="0,0,8,4" />
+              <Button Content="Update" Command="{Binding UpdateUserCommand}" Margin="0,0,8,4" />
+              <Button Content="Delete" Command="{Binding DeleteUserCommand}" Margin="0,0,8,4" />
+            </WrapPanel>
+            <TextBlock Classes="hint" TextWrapping="Wrap"
+                       Text="ONVIF never returns passwords. Each action asks first. Listing users needs an administrator login; cameras usually refuse to delete the last administrator." />
+          </StackPanel>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="Network">
+        <ScrollViewer Margin="0,4,0,0">
+          <StackPanel Spacing="6" MaxWidth="900" HorizontalAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Refresh all" Command="{Binding LoadNetworkCommand}" />
+              <TextBlock Classes="hint" VerticalAlignment="Center"
+                         Text="Every Apply below can cut this app off from the camera. Each one asks first." />
+            </StackPanel>
+
+            <TextBlock Classes="section" Text="Interfaces" />
+            <DataGrid ItemsSource="{Binding Interfaces}" SelectedItem="{Binding SelectedInterface}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal" MaxHeight="160">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="Auto" />
+                <DataGridTextColumn Header="MAC" Binding="{Binding HwAddress}" Width="Auto" />
+                <DataGridCheckBoxColumn Header="DHCP" Binding="{Binding Dhcp}" Width="Auto" />
+                <DataGridTextColumn Header="Static" Binding="{Binding ManualAddress}" Width="*" />
+                <DataGridTextColumn Header="From DHCP" Binding="{Binding FromDhcpAddress}" Width="*" />
+                <DataGridTextColumn Header="MTU" Binding="{Binding Mtu}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <CheckBox Content="DHCP" IsChecked="{Binding EditDhcp}" />
+              <TextBox Text="{Binding EditAddress}" Width="160" Watermark="192.168.1.64" IsEnabled="{Binding !EditDhcp}" />
+              <TextBlock Text="/" VerticalAlignment="Center" />
+              <NumericUpDown Value="{Binding EditPrefix}" Minimum="1" Maximum="32" FormatString="0" Width="70"
+                             IsEnabled="{Binding !EditDhcp}" />
+              <Button Content="Apply interface" Command="{Binding ApplyInterfaceCommand}" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="130,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="8"
+                  Margin="0,8,0,0">
+              <TextBlock Grid.Row="0" Text="Hostname" VerticalAlignment="Center" />
+              <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <TextBox Text="{Binding EditHostname}" Width="240" />
+                <TextBlock Classes="hint" Text="{Binding HostnameNote}" VerticalAlignment="Center" />
+              </StackPanel>
+              <Button Grid.Row="0" Grid.Column="2" Content="Apply" Command="{Binding ApplyHostnameCommand}" />
+
+              <TextBlock Grid.Row="1" Text="DNS" VerticalAlignment="Center" />
+              <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <CheckBox Content="from DHCP" IsChecked="{Binding DnsFromDhcp}" />
+                <TextBox Text="{Binding DnsServers}" Width="240" Watermark="servers, comma-separated" IsEnabled="{Binding !DnsFromDhcp}" />
+                <TextBox Text="{Binding DnsSearchDomains}" Width="200" Watermark="search domains" />
+              </StackPanel>
+              <Button Grid.Row="1" Grid.Column="2" Content="Apply" Command="{Binding ApplyDnsCommand}" />
+              <TextBlock Grid.Row="2" Grid.Column="1" Classes="hint" Text="{Binding DnsDhcpText}" />
+
+              <TextBlock Grid.Row="3" Text="NTP" VerticalAlignment="Center" />
+              <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <CheckBox Content="from DHCP" IsChecked="{Binding NtpFromDhcp}" />
+                <TextBox Text="{Binding NtpServers}" Width="320" Watermark="addresses or host names, comma-separated"
+                         IsEnabled="{Binding !NtpFromDhcp}"
+                         ToolTip.Tip="Some cameras keep only the first server of the list; Refresh shows what was stored." />
+                <TextBlock Classes="hint" Text="{Binding NtpDhcpText}" VerticalAlignment="Center" />
+              </StackPanel>
+              <Button Grid.Row="3" Grid.Column="2" Content="Apply" Command="{Binding ApplyNtpCommand}" />
+
+              <TextBlock Grid.Row="4" Text="Default gateway" VerticalAlignment="Center" />
+              <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding GatewayIPv4}" Width="240" HorizontalAlignment="Left"
+                       Watermark="IPv4 gateway" />
+              <Button Grid.Row="4" Grid.Column="2" Content="Apply" Command="{Binding ApplyGatewayCommand}" />
+            </Grid>
+
+            <TextBlock Classes="section" Text="Protocols" Margin="0,8,0,0" />
+            <ItemsControl ItemsSource="{Binding Protocols}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProtocolRow">
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                    <CheckBox IsChecked="{Binding Enabled}" Content="{Binding Name}" Width="110" />
+                    <TextBox Text="{Binding PortsText}" Width="160" Watermark="ports" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Apply protocols" Command="{Binding ApplyProtocolsCommand}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="Scopes">
+        <Grid ColumnDefinitions="*,12,420" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Discovery scopes" Margin="0" VerticalAlignment="Center" />
+              <Button Content="Refresh" Command="{Binding LoadScopesCommand}" />
+              <Button Content="Remove selected" Command="{Binding RemoveScopeCommand}" IsEnabled="{Binding CanRemoveScope}" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Scopes}" SelectedItem="{Binding SelectedScope}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Scope" Binding="{Binding ScopeItem}" Width="*" />
+                <DataGridCheckBoxColumn Header="Fixed" Binding="{Binding Fixed}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+          <StackPanel Grid.Column="2" Spacing="6">
+            <TextBlock Classes="section" Text="Add" Margin="0" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBox Text="{Binding NewScope}" Width="330" Classes="mono" />
+              <Button Content="Add" Command="{Binding AddScopeCommand}" />
+            </StackPanel>
+            <TextBlock Classes="section" Text="Replace configurable" />
+            <TextBox Text="{Binding ConfigurableScopesText}" AcceptsReturn="True" Height="120" Classes="mono" />
+            <Button Content="Replace" Command="{Binding ReplaceScopesCommand}" HorizontalAlignment="Left" />
+            <TextBlock Classes="hint" TextWrapping="Wrap"
+                       Text="One scope per line. Discovery tools show onvif://www.onvif.org/name/… as the camera's name and …/location/… as where it is. Fixed scopes cannot be changed. Each action asks first." />
           </StackPanel>
         </Grid>
       </TabItem>

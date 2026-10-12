@@ -196,6 +196,97 @@
         </Grid>
       </TabItem>
 
+      <TabItem Header="OSD &amp; sources">
+        <Grid ColumnDefinitions="*,8,*" Margin="0,4,0,0">
+          <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+              <TextBlock Classes="section" Text="Video source configurations" VerticalAlignment="Center" Margin="0" />
+              <Button Content="Refresh" Command="{Binding LoadVideoSourcesCommand}" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+              <TextBlock Classes="section" Text="Physical sources" Margin="0" />
+              <DataGrid ItemsSource="{Binding VideoSources}" IsReadOnly="True" GridLinesVisibility="Horizontal" MaxHeight="140">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="Token" Binding="{Binding Token}" Width="*" />
+                  <DataGridTextColumn Header="fps" Binding="{Binding Framerate}" Width="Auto" />
+                  <DataGridTextColumn Header="Width" Binding="{Binding Width}" Width="Auto" />
+                  <DataGridTextColumn Header="Height" Binding="{Binding Height}" Width="Auto" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <TextBlock Classes="hint" Text="{Binding VideoSourcesNote}" TextWrapping="Wrap" />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding VideoSourceConfigs}" SelectedItem="{Binding SelectedVideoSourceConfig}"
+                      IsReadOnly="True" GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
+                <DataGridTextColumn Header="Source" Binding="{Binding SourceToken}" Width="*" />
+                <DataGridTextColumn Header="Width" Binding="{Binding Width}" Width="Auto" />
+                <DataGridTextColumn Header="Height" Binding="{Binding Height}" Width="Auto" />
+                <DataGridTextColumn Header="Profiles" Binding="{Binding UseCount}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+
+          <DockPanel Grid.Column="2">
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,4">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Classes="section" Text="On-screen display" VerticalAlignment="Center" Margin="0" />
+                <Button Content="Refresh" Command="{Binding LoadOsdsCommand}" />
+              </StackPanel>
+              <TextBlock Classes="hint" Text="{Binding OsdOptionsText}" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+              <Grid ColumnDefinitions="90,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                <TextBlock Grid.Row="0" Text="Type" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding OsdTypes}" SelectedItem="{Binding EditOsdType}" Width="160" />
+                <TextBlock Grid.Row="1" Text="Text" VerticalAlignment="Center" />
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                  <ComboBox ItemsSource="{Binding OsdTextTypes}" SelectedItem="{Binding EditTextType}" Width="140" />
+                  <TextBox Text="{Binding EditPlainText}" Width="220" Watermark="text for Plain" />
+                </StackPanel>
+                <TextBlock Grid.Row="2" Text="Formats" VerticalAlignment="Center" />
+                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                  <ComboBox ItemsSource="{Binding OsdDateFormats}" SelectedItem="{Binding EditDateFormat}" Width="140" PlaceholderText="date" />
+                  <ComboBox ItemsSource="{Binding OsdTimeFormats}" SelectedItem="{Binding EditTimeFormat}" Width="140" PlaceholderText="time" />
+                </StackPanel>
+                <TextBlock Grid.Row="3" Text="Position" VerticalAlignment="Center" />
+                <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                  <ComboBox ItemsSource="{Binding OsdPositions}" SelectedItem="{Binding EditPosition}" Width="140" />
+                  <NumericUpDown Value="{Binding EditX}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="90"
+                                 IsEnabled="{Binding IsCustomPosition}" ToolTip.Tip="x: -1 left … 1 right" />
+                  <NumericUpDown Value="{Binding EditY}" Minimum="-1" Maximum="1" Increment="0.05" FormatString="0.00" Width="90"
+                                 IsEnabled="{Binding IsCustomPosition}" ToolTip.Tip="y: -1 bottom … 1 top" />
+                </StackPanel>
+                <TextBlock Grid.Row="4" Text="Font size" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding EditFontSize}" Minimum="{Binding FontSizeMin}"
+                               Maximum="{Binding FontSizeMax}" Increment="1" FormatString="0" Width="90" HorizontalAlignment="Left" />
+                <TextBlock Grid.Row="5" Text="Image" VerticalAlignment="Center" />
+                <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding EditImagePath}" Watermark="image path on the camera (Image OSDs)" />
+              </Grid>
+              <WrapPanel>
+                <Button Content="Create new" Command="{Binding CreateOsdCommand}" Margin="0,0,8,4" />
+                <Button Content="Apply to selected" Command="{Binding ApplyOsdCommand}" Margin="0,0,8,4" />
+                <Button Content="Delete selected" Command="{Binding DeleteOsdCommand}" Margin="0,0,8,4" />
+              </WrapPanel>
+              <TextBlock Classes="hint" TextWrapping="Wrap"
+                         Text="OSDs belong to the video source configuration on the left, so every stream that uses it shows them. Cameras often round the font size to their own steps, and some keep one font size for all OSDs — changing it here changes the others too. Delete asks first." />
+            </StackPanel>
+            <DataGrid ItemsSource="{Binding Osds}" SelectedItem="{Binding SelectedOsd}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="Auto" />
+                <DataGridTextColumn Header="Text type" Binding="{Binding TextType}" Width="Auto" />
+                <DataGridTextColumn Header="Text" Binding="{Binding PlainText}" Width="*" />
+                <DataGridTextColumn Header="Position" Binding="{Binding PositionType}" Width="Auto" />
+                <DataGridTextColumn Header="x" Binding="{Binding X, StringFormat='{}{0:0.##}'}" Width="Auto" />
+                <DataGridTextColumn Header="y" Binding="{Binding Y, StringFormat='{}{0:0.##}'}" Width="Auto" />
+                <DataGridTextColumn Header="Font" Binding="{Binding FontSize}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </Grid>
+      </TabItem>
+
     </TabControl>
   </Panel>
 </UserControl>

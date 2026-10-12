@@ -4,13 +4,26 @@ using System.ServiceModel.Channels;
 
 namespace OnvifLib
 {
+  /// <param name="VideoSourceToken">
+  /// The physical video source — the token Imaging is addressed by.
+  /// </param>
+  /// <param name="VideoSourceConfigToken">
+  /// The video source <em>configuration</em> on the profile — the token OSDs are attached to.
+  /// The two are easy to confuse and differ on most cameras.
+  /// </param>
+  /// <param name="Token">The profile token every media and PTZ call is addressed by.</param>
+  /// <param name="Name">Display name.</param>
+  /// <param name="Width">Encoder width.</param>
+  /// <param name="Height">Encoder height.</param>
+  /// <param name="Encoding">Encoder name, e.g. H264.</param>
   public record OnvifProfileInfo(
     string Token,
     string Name,
     int Width,
     int Height,
     string Encoding,
-    string VideoSourceToken = ""
+    string VideoSourceToken = "",
+    string VideoSourceConfigToken = ""
   );
 
   public record OnvifVideoEncoderConfig(
@@ -182,6 +195,31 @@ namespace OnvifLib
     public virtual Task AttachAnalyticsConfigAsync(string profileToken, string configToken)
       => Task.CompletedTask;
     public virtual Task DetachAnalyticsConfigAsync(string profileToken, string configToken)
+      => Task.CompletedTask;
+
+    // ---- Video sources and OSD ----------------------------------------------------------------
+    // OSDs hang off a video source *configuration* (OnvifProfileInfo.VideoSourceConfigToken), not
+    // off the profile and not off the physical source.
+
+    public virtual Task<List<OnvifVideoSourceConfig>> GetVideoSourceConfigurationsAsync()
+      => Task.FromResult<List<OnvifVideoSourceConfig>>([]);
+    public virtual Task<List<OnvifVideoSource>> GetVideoSourcesAsync()
+      => Task.FromResult<List<OnvifVideoSource>>([]);
+
+    /// <param name="videoSourceConfigToken">Null lists the OSDs of every configuration.</param>
+    public virtual Task<List<OnvifOsd>> GetOsdsAsync(string? videoSourceConfigToken = null)
+      => Task.FromResult<List<OnvifOsd>>([]);
+    public virtual Task<OnvifOsdOptions?> GetOsdOptionsAsync(string videoSourceConfigToken)
+      => Task.FromResult<OnvifOsdOptions?>(null);
+
+    /// <summary>Creates an OSD and returns the token the camera gave it. <c>osd.Token</c> is ignored.</summary>
+    public virtual Task<string> CreateOsdAsync(OnvifOsd osd)
+      => Task.FromResult(string.Empty);
+
+    /// <summary>Updates an existing OSD; null members of <paramref name="osd"/> are left as the camera has them.</summary>
+    public virtual Task SetOsdAsync(OnvifOsd osd)
+      => Task.CompletedTask;
+    public virtual Task DeleteOsdAsync(string osdToken)
       => Task.CompletedTask;
 
     protected static T FindConfigOrThrow<T>(IEnumerable<T> configs, string token, Func<T, string?> tokenSelector, string configTypeName)

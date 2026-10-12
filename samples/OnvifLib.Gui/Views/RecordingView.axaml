@@ -19,7 +19,8 @@
 
       <TabControl>
         <TabItem Header="On camera">
-          <Grid RowDefinitions="*,8,Auto" Margin="0,4,0,0">
+          <Grid ColumnDefinitions="*,12,400" Margin="0,4,0,0">
+          <Grid Grid.Column="0" RowDefinitions="*,8,Auto">
             <DockPanel Grid.Row="0">
               <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
                 <TextBlock Classes="section" Text="Recordings" VerticalAlignment="Center" Margin="0" />
@@ -40,18 +41,67 @@
                 <TextBlock Classes="section" Text="Jobs" VerticalAlignment="Center" Margin="0" />
                 <Button Content="Job → Active" Command="{Binding SetJobActiveCommand}" />
                 <Button Content="Job → Idle" Command="{Binding SetJobIdleCommand}" />
+                <Button Content="Delete job" Command="{Binding DeleteJobCommand}" />
                 <Button Content="Delete recording" Command="{Binding DeleteRecordingCommand}" />
               </StackPanel>
               <TextBlock DockPanel.Dock="Bottom" Classes="hint" Margin="0,4,0,0"
-                         Text="Idle stops recording. Delete erases footage on the device. Both ask first." />
+                         Text="Idle stops recording. Delete erases footage on the device. All of these ask first." />
               <DataGrid ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}"
                         IsReadOnly="True" Height="160" GridLinesVisibility="Horizontal">
                 <DataGrid.Columns>
                   <DataGridTextColumn Header="Job" Binding="{Binding JobToken}" Width="*" />
+                  <DataGridTextColumn Header="Recording" Binding="{Binding RecordingToken}" Width="*" />
+                  <DataGridTextColumn Header="Source" Binding="{Binding SourceToken}" Width="Auto" />
                   <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto" />
                 </DataGrid.Columns>
               </DataGrid>
             </DockPanel>
+          </Grid>
+
+          <ScrollViewer Grid.Column="2">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="section" Text="Recording job" Margin="0" />
+              <TextBlock Classes="hint" TextWrapping="Wrap"
+                         Text="Select a job to edit it, or fill in a recording and a profile to create one. A recording found on the Search page can be used too." />
+              <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                <TextBlock Grid.Row="0" Text="Recording" VerticalAlignment="Center" />
+                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditRecordingToken}" Classes="mono" />
+                <TextBlock Grid.Row="1" Text="Source" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding JobSources}" SelectedItem="{Binding EditJobSource}"
+                          Width="200" PlaceholderText="media profile" />
+                <TextBlock Grid.Row="2" Text="Mode" VerticalAlignment="Center" />
+                <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding JobModes}" SelectedItem="{Binding EditJobMode}" Width="200" />
+                <TextBlock Grid.Row="3" Text="Priority" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding EditJobPriority}" Minimum="0" Maximum="100"
+                               FormatString="0" Width="100" HorizontalAlignment="Left" />
+              </Grid>
+              <TextBlock Classes="hint" Text="{Binding RecordingOptionsText}" TextWrapping="Wrap" />
+              <WrapPanel>
+                <Button Content="Create job" Command="{Binding CreateJobCommand}" Margin="0,0,8,4" />
+                <Button Content="Apply to selected job" Command="{Binding ApplyJobConfigurationCommand}" Margin="0,0,8,4" />
+                <Button Content="State" Command="{Binding LoadJobStateCommand}" Margin="0,0,8,4" />
+              </WrapPanel>
+              <SelectableTextBlock Text="{Binding JobStateText}" Classes="mono" TextWrapping="Wrap" />
+
+              <TextBlock Classes="section" Text="New recording" Margin="0,10,0,0" />
+              <TextBlock Classes="hint" TextWrapping="Wrap"
+                         Text="Only cameras reporting dynamic recordings/tracks accept these; most edge cameras have a fixed set." />
+              <StackPanel Spacing="4" IsEnabled="{Binding DynamicRecordings}">
+                <TextBox Text="{Binding NewRecordingName}" Watermark="source name" />
+                <TextBox Text="{Binding NewRecordingContent}" Watermark="content description" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBox Text="{Binding NewRecordingRetention}" Width="120" Watermark="PT0S"
+                           ToolTip.Tip="ISO 8601 duration to keep data; PT0S keeps it until space runs out." />
+                  <Button Content="Create recording" Command="{Binding CreateRecordingCommand}" />
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding DynamicTracks}">
+                <ComboBox ItemsSource="{Binding TrackTypes}" SelectedItem="{Binding NewTrackType}" Width="110" />
+                <TextBox Text="{Binding NewTrackDescription}" Width="140" Watermark="description" />
+                <Button Content="Add track" Command="{Binding CreateTrackCommand}" />
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
           </Grid>
         </TabItem>
 
@@ -125,6 +175,43 @@
 
           </Grid>
         </TabItem>
+        <TabItem Header="Events">
+          <DockPanel Margin="0,4,0,0">
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,4">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <DatePicker SelectedDate="{Binding FromDate}" />
+                <TextBlock Text="…" VerticalAlignment="Center" />
+                <DatePicker SelectedDate="{Binding ToDate}" />
+                <NumericUpDown Value="{Binding MaxResults}" Minimum="1" Maximum="10000" FormatString="0" Width="100"
+                               ToolTip.Tip="Maximum number of events" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <CheckBox Content="include start state" IsChecked="{Binding IncludeStartState}"
+                          ToolTip.Tip="Also report what every property was when the window opens — otherwise a motion that began earlier shows only its end." />
+                <CheckBox Content="only the selected recording" IsChecked="{Binding OnlySelectedRecording}" />
+                <Button Content="Find events" Command="{Binding SearchEventsCommand}" IsEnabled="{Binding !IsSearching}" />
+                <Button Content="Cancel" Command="{Binding CancelSearchCommand}" IsEnabled="{Binding IsSearching}" />
+                <TextBlock Classes="hint" Text="{Binding EventsSummary}" VerticalAlignment="Center" />
+              </StackPanel>
+              <TextBlock Classes="hint" TextWrapping="Wrap"
+                         Text="The window shares its dates with the Search page and is converted into the camera's clock. Cameras that report placeholder summary bounds (1970 … 2038) usually refuse them as an event window — pick real dates." />
+            </StackPanel>
+            <TextBox DockPanel.Dock="Bottom" Height="180" Classes="mono" IsReadOnly="True" AcceptsReturn="True"
+                     Margin="0,8,0,0" Text="{Binding SelectedEventXml, Mode=OneWay}" />
+            <DataGrid ItemsSource="{Binding EdgeEvents}" SelectedItem="{Binding SelectedEvent}" IsReadOnly="True"
+                      GridLinesVisibility="Horizontal">
+              <DataGrid.Columns>
+                <DataGridTextColumn Header="Camera time" Binding="{Binding CameraTimeText}" Width="Auto" />
+                <DataGridTextColumn Header="Our time" Binding="{Binding OurTimeText}" Width="Auto" />
+                <DataGridTextColumn Header="Topic" Binding="{Binding Event.Topic}" Width="2*" />
+                <DataGridCheckBoxColumn Header="Start" Binding="{Binding Event.StartStateEvent}" Width="Auto" />
+                <DataGridTextColumn Header="Data" Binding="{Binding Event.Summary}" Width="2*" />
+                <DataGridTextColumn Header="Track" Binding="{Binding Event.TrackToken}" Width="Auto" />
+              </DataGrid.Columns>
+            </DataGrid>
+          </DockPanel>
+        </TabItem>
+
       </TabControl>
     </DockPanel>
   </Panel>

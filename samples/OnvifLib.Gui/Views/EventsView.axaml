@@ -27,8 +27,39 @@
                        FormatString="0" Width="110" />
       </StackPanel>
 
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+        <TextBlock Text="Topic filter" VerticalAlignment="Center" />
+        <TextBox Text="{Binding TopicFilter}" Width="420" Classes="mono"
+                 Watermark="tns1:VideoSource/MotionAlarm|tns1:RuleEngine//." />
+        <Button Content="Apply filter" Command="{Binding ApplyFilterCommand}"
+                ToolTip.Tip="Re-subscribes with this expression. Some cameras accept a topic they never raise and simply deliver nothing, so an empty list after a filter is not proof of a typo." />
+        <Button Content="Clear" Command="{Binding ClearFilterCommand}" />
+        <Button Content="Sync point" Command="{Binding SyncPointCommand}" IsEnabled="{Binding IsReceiving}"
+                ToolTip.Tip="Ask the camera to re-send the current state of every property event" />
+        <TextBlock Text="{Binding ActiveFilterText, StringFormat='subscribed to: {0}'}" VerticalAlignment="Center"
+                   Classes="hint" />
+      </StackPanel>
+
       <TextBlock DockPanel.Dock="Top" Classes="hint" Margin="0,0,0,4"
-                 Text="A camera that reports nothing is normal — most only emit on motion or an I/O change. Trigger something (wave at it, toggle an input) and watch the list." />
+                 Text="A camera that reports nothing is normal — most only emit on motion or an I/O change. Trigger something (wave at it, toggle an input) and watch the list, or press Sync point to get the current state of everything." />
+
+      <!-- The camera's own topic list: what can be filtered on. -->
+      <DockPanel DockPanel.Dock="Right" Width="340" Margin="8,0,0,0">
+        <TextBlock DockPanel.Dock="Top" Classes="section" Text="Topics the camera can raise" Margin="0,0,0,4" />
+        <TextBlock DockPanel.Dock="Top" Classes="hint" Text="{Binding CapabilitiesText}" TextWrapping="Wrap"
+                   Margin="0,0,0,4" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
+          <Button Content="Reload" Command="{Binding LoadTopicsCommand}" />
+          <Button Content="Use in filter" Command="{Binding UseTopicCommand}"
+                  ToolTip.Tip="Put the selected topic into the filter box (appended with | when it already has one)" />
+        </StackPanel>
+        <DataGrid ItemsSource="{Binding Topics}" SelectedItem="{Binding SelectedTopic}"
+                  IsReadOnly="True" GridLinesVisibility="Horizontal">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="Topic" Binding="{Binding Path}" Width="*" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </DockPanel>
 
       <!-- Camera.ParseEvent: nothing on the pull path reaches it, so this is the only way to
            exercise it from the app. -->

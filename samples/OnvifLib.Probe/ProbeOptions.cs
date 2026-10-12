@@ -201,9 +201,11 @@ public sealed class ProbeOptions
 
     WHAT IT MAY DO
       --allow-writes       also run reversible writes (PTZ nudge + return, temporary preset,
-                           imaging change + restore, no-op re-writes of configs).
-                           Destructive calls (reboot, delete, clock changes, auxiliary commands,
-                           analytics create/modify/delete) are never run and are reported as SKIP.
+                           home and back, imaging and IR-cut change + restore, focus nudge,
+                           a temporary OSD, no-op re-writes of configs, hostname and scopes).
+                           Destructive calls (reboot, delete, clock changes, users, network,
+                           auxiliary commands, creating recordings/jobs, analytics
+                           create/modify/delete) are never run and are reported as SKIP.
       --allow-relay        additionally pulse each relay output on and off (implies --allow-writes).
                            Separate because a relay is usually wired to a door, gate or alarm:
                            electrically reversible, physically not.

@@ -64,13 +64,20 @@ it exists and was not exercised.
 
 **`--allow-writes`** enables writes that undo themselves:
 
-- PTZ: a continuous nudge and its mirror image, a relative move there and back, and a preset that
-  is created, visited, and removed in a `finally`.
-- Imaging: brightness moved by 5 % of its range, read back, and restored in a `finally`.
+- PTZ: a continuous nudge and its mirror image, an absolute and a relative move there and back,
+  a preset that is created, visited, and removed in a `finally`, and a trip to the home position
+  and back (by absolute move, or through a temporary preset on heads without one).
+- Imaging: brightness moved by 5 % of its range and the IR cut filter switched to another mode,
+  each read back and restored in a `finally`; the focus motor moved a little and back.
+- OSD: a text OSD created on a free slot, re-written unchanged, and deleted. The camera's own
+  OSDs are never touched, and nothing is created when the configuration has no free slot.
 - Configurations: `SetVideoEncoderConfig`, `SetAudioEncoderConfig`, `SetMetadataConfig`,
-  `SetRelayOutputSettings` and `SetDigitalInputIdleState` are re-sent with exactly the values that
-  were just read — a no-op write that proves the call is accepted without choosing settings the
-  camera might not support.
+  `SetRelayOutputSettings`, `SetDigitalInputIdleState`, `SetHostname` and `SetScopes` are re-sent
+  with exactly the values that were just read — a no-op write that proves the call is accepted
+  without choosing settings the camera might not support.
+
+Event topic filters and the synchronization point run at every flag level: they change the
+probe's own subscription, not the camera.
 
 **`--allow-relay`** is separate from `--allow-writes` on purpose. Pulsing a relay output is
 electrically reversible but physically is not: the output is usually wired to a door strike, a
@@ -78,14 +85,14 @@ gate, or an alarm.
 
 **Never, at any flag level:**
 
-`Reboot`, `SetTime` / `SyncTime`, `SendAuxiliaryCommand` (one of the vendor commands typically
-formats the SD card), `DeleteRecording` / `DeleteTrack` / `DeleteRecordingJob`,
-`SetRecordingConfiguration`, `SetRecordingJobMode`, the analytics
-`Create` / `Modify` / `Delete` calls, and the metadata/analytics `Attach` / `Detach` pair.
-Those belong in the GUI, behind a confirmation dialog.
-
-`AbsoluteMove` is skipped even with `--allow-writes` for a different reason: the library exposes no
-way to read the current pan/tilt/zoom, so there is nothing to restore to.
+`Reboot`, `SetTime` / `SyncTime` / `SetSystemDateAndTime`, `SendAuxiliaryCommand` (one of the
+vendor commands typically formats the SD card) and its PTZ counterpart, `SetHomePosition`, user
+`Create` / `Set` / `Delete`, `AddScopes` / `RemoveScopes`, every network setter (interface, DNS,
+NTP, protocols, gateway — even an identical re-send restarts the network stack on some firmware),
+`CreateRecording` / `CreateTrack` / `CreateRecordingJob` / `SetRecordingJobConfiguration`,
+`DeleteRecording` / `DeleteTrack` / `DeleteRecordingJob`, `SetRecordingConfiguration`,
+`SetRecordingJobMode`, the analytics `Create` / `Modify` / `Delete` calls, and the
+metadata/analytics `Attach` / `Detach` pair. Those belong in the GUI, behind a confirmation dialog.
 
 ## Output
 

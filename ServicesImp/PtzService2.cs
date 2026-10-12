@@ -237,16 +237,117 @@ namespace OnvifLib
       return resp.PresetToken ?? string.Empty;
     }
 
-    public async Task GotoPresetAsync(string profileToken, string presetToken)
+    /// <summary>Goes to a preset at half speed — the speed this library has always used.</summary>
+    public Task GotoPresetAsync(string profileToken, string presetToken) =>
+      GotoPresetAsync(profileToken, presetToken, 0.5f, 0.5f);
+
+    /// <param name="speedPanTilt">
+    /// Pan/tilt speed in the camera's speed space (usually 0..1). Null for both speeds leaves the
+    /// Speed element off the wire, and the camera uses its own default speed.
+    /// </param>
+    /// <param name="profileToken">The media profile the PTZ configuration is attached to.</param>
+    /// <param name="presetToken">The preset to go to.</param>
+    /// <param name="speedZoom">Zoom speed; null leaves it to the camera.</param>
+    public async Task GotoPresetAsync(string profileToken, string presetToken, float? speedPanTilt, float? speedZoom = null)
     {
       if (_ptzClient == null)
         throw new InvalidOperationException("PTZ client not initialized");
-      await _ptzClient.GotoPresetAsync(profileToken, presetToken, new PTZSpeed
-      {
-        PanTilt = new Vector2D { x = 0.5f, y = 0.5f },
-        Zoom    = new Vector1D { x = 0.5f },
-      });
+      await _ptzClient.GotoPresetAsync(profileToken, presetToken, MakeSpeed(speedPanTilt, speedZoom));
     }
+
+    /// <summary>Moves to the home position. Null speeds let the camera use its default.</summary>
+    public async Task GotoHomePositionAsync(string profileToken, float? speedPanTilt = null, float? speedZoom = null)
+    {
+      if (_ptzClient == null)
+        throw new InvalidOperationException("PTZ client not initialized");
+      await _ptzClient.GotoHomePositionAsync(profileToken, MakeSpeed(speedPanTilt, speedZoom));
+    }
+
+    /// <summary>Stores the current position as home.</summary>
+    /// <remarks>
+    /// Overwrites the stored home with no way back, and faults (<c>ter:CannotOverwriteHome</c>)
+    /// on a node whose <see cref="PtzNodeInfo.FixedHomePosition"/> is set.
+    /// </remarks>
+    public async Task SetHomePositionAsync(string profileToken)
+    {
+      if (_ptzClient == null)
+        throw new InvalidOperationException("PTZ client not initialized");
+      await _ptzClient.SetHomePositionAsync(profileToken);
+    }
+
+    /// <summary>
+    /// Sends one of the node's auxiliary commands — wiper, washer, IR lamp, heater — and returns
+    /// the camera's reply.
+    /// </summary>
+    /// <remarks>
+    /// The command strings are the camera's own, taken from <see cref="PtzNodeInfo.AuxiliaryCommands"/>
+    /// (ONVIF suggests <c>tt:Wiper|On</c>-style names but does not mandate them). These drive
+    /// physical hardware, so a caller should confirm before sending.
+    /// </remarks>
+    public async Task<string> SendAuxiliaryCommandAsync(string profileToken, string command)
+    {
+      if (_ptzClient == null)
+        throw new InvalidOperationException("PTZ client not initialized");
+      return await _ptzClient.SendAuxiliaryCommandAsync(profileToken, command) ?? string.Empty;
+    }
+
+    /// <summary>The PTZ nodes — the mechanics behind the configurations, and what each can do.</summary>
+    /// <remarks>
+    /// Empty when the camera will not answer. GetNodes faults on cameras that advertise the PTZ
+    /// WSDL with no motor behind it, and that is not worth an exception to every caller that only
+    /// wants to know whether a home button makes sense.
+    /// </remarks>
+    public async Task<List<PtzNodeInfo>> GetNodesAsync()
+    {
+      if (_ptzClient == null) return [];
+      try
+      {
+        var resp = await _ptzClient.GetNodesAsync();
+        return (resp?.PTZNode ?? []).Select(n =>
+        {
+          var spaces = n.SupportedPTZSpaces;
+          return new PtzNodeInfo(
+            n.token ?? string.Empty,
+            n.Name ?? string.Empty,
+            n.HomeSupported,
+            n.FixedHomePositionSpecified && n.FixedHomePosition,
+            n.MaximumNumberOfPresets,
+            (n.AuxiliaryCommands ?? []).Where(c => !string.IsNullOrWhiteSpace(c)).ToList(),
+            Uris(spaces?.AbsolutePanTiltPositionSpace),
+            Uris(spaces?.AbsoluteZoomPositionSpace),
+            Uris(spaces?.RelativePanTiltTranslationSpace),
+            Uris(spaces?.RelativeZoomTranslationSpace),
+            Uris(spaces?.ContinuousPanTiltVelocitySpace),
+            Uris(spaces?.ContinuousZoomVelocitySpace),
+            Uris(spaces?.PanTiltSpeedSpace),
+            Uris(spaces?.ZoomSpeedSpace),
+            n.Extension?.SupportedPresetTour?.MaximumNumberOfPresetTours ?? 0,
+            n.GeoMoveSpecified && n.GeoMove);
+        }).ToList();
+      }
+      catch (Exception ex)
+      {
+        _logger?.Error($"ONVIF GetNodes failed for {_url}: {ex.Message}");
+        return [];
+      }
+    }
+
+    private static IReadOnlyList<string> Uris(Space2DDescription[]? spaces) =>
+      (spaces ?? []).Select(s => s.URI ?? string.Empty).Where(u => u.Length > 0).ToList();
+
+    private static IReadOnlyList<string> Uris(Space1DDescription[]? spaces) =>
+      (spaces ?? []).Select(s => s.URI ?? string.Empty).Where(u => u.Length > 0).ToList();
+
+    // Null for both leaves the Speed element out entirely, which is the only way to ask for the
+    // camera's own default — a zero speed is "don't move" on some firmware.
+    private static PTZSpeed? MakeSpeed(float? panTilt, float? zoom) =>
+      panTilt is null && zoom is null
+        ? null
+        : new PTZSpeed
+          {
+            PanTilt = panTilt is { } pt ? new Vector2D { x = pt, y = pt } : null,
+            Zoom = zoom is { } z ? new Vector1D { x = z } : null,
+          };
 
     public async Task RemovePresetAsync(string profileToken, string presetToken)
     {
@@ -317,6 +418,41 @@ namespace OnvifLib
   /// </remarks>
   public record PtzSpaces(PtzSpace? AbsolutePanTilt, PtzSpace? RelativePanTilt, PtzSpace? ContinuousPanTilt);
   public record PtzPresetDto(string Token, string Name);
+
+  /// <summary>One PTZ node: the mechanics a configuration drives, and its limits.</summary>
+  /// <param name="HomeSupported">GotoHomePosition does something on this node.</param>
+  /// <param name="FixedHomePosition">Home is set at the factory; SetHomePosition will fault.</param>
+  /// <param name="AuxiliaryCommands">The strings SendAuxiliaryCommandAsync accepts, as the camera names them.</param>
+  /// <param name="MaximumNumberOfPresetTours">Zero when the camera did not say.</param>
+  /// <param name="Token">The node token.</param>
+  /// <param name="Name">Display name.</param>
+  /// <param name="MaximumNumberOfPresets">How many presets the node stores.</param>
+  /// <param name="AbsolutePanTiltSpaces">URIs of the absolute pan/tilt spaces.</param>
+  /// <param name="AbsoluteZoomSpaces">URIs of the absolute zoom spaces.</param>
+  /// <param name="RelativePanTiltSpaces">URIs of the relative pan/tilt spaces.</param>
+  /// <param name="RelativeZoomSpaces">URIs of the relative zoom spaces.</param>
+  /// <param name="ContinuousPanTiltSpaces">URIs of the continuous pan/tilt spaces.</param>
+  /// <param name="ContinuousZoomSpaces">URIs of the continuous zoom spaces.</param>
+  /// <param name="PanTiltSpeedSpaces">URIs of the pan/tilt speed spaces.</param>
+  /// <param name="ZoomSpeedSpaces">URIs of the zoom speed spaces.</param>
+  /// <param name="GeoMove">The node accepts GeoMove.</param>
+  public record PtzNodeInfo(
+    string Token,
+    string Name,
+    bool HomeSupported,
+    bool FixedHomePosition,
+    int MaximumNumberOfPresets,
+    IReadOnlyList<string> AuxiliaryCommands,
+    IReadOnlyList<string> AbsolutePanTiltSpaces,
+    IReadOnlyList<string> AbsoluteZoomSpaces,
+    IReadOnlyList<string> RelativePanTiltSpaces,
+    IReadOnlyList<string> RelativeZoomSpaces,
+    IReadOnlyList<string> ContinuousPanTiltSpaces,
+    IReadOnlyList<string> ContinuousZoomSpaces,
+    IReadOnlyList<string> PanTiltSpeedSpaces,
+    IReadOnlyList<string> ZoomSpeedSpaces,
+    int MaximumNumberOfPresetTours,
+    bool GeoMove);
 
   /// <summary>A camera's reported aim, in whatever space it answers in.</summary>
   /// <param name="Pan">Horizontal position, uninterpreted: the camera's own units.</param>

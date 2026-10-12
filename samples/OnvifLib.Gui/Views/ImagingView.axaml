@@ -1,8 +1,33 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:OnvifLib.Gui.ViewModels"
+             xmlns:inf="using:OnvifLib.Gui.Infrastructure"
+             xmlns:views="using:OnvifLib.Gui.Views"
              x:Class="OnvifLib.Gui.Views.ImagingView"
              x:DataType="vm:ImagingViewModel">
+
+  <UserControl.DataTemplates>
+    <!-- One numeric setting: send-tick, label, slider within the camera's range, value. -->
+    <DataTemplate DataType="inf:SliderSetting">
+      <Grid ColumnDefinitions="Auto,170,*,80" Margin="0,1">
+        <CheckBox Grid.Column="0" IsChecked="{Binding Change}" IsEnabled="{Binding IsAvailable}" />
+        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" />
+        <Slider Grid.Column="2" Value="{Binding Value}" Minimum="{Binding Min}" Maximum="{Binding Max}"
+                IsEnabled="{Binding IsAvailable}" />
+        <TextBlock Grid.Column="3" Text="{Binding Value, StringFormat='{}{0:0.##}'}" VerticalAlignment="Center"
+                   Margin="8,0,0,0" IsVisible="{Binding IsAvailable}" />
+      </Grid>
+    </DataTemplate>
+    <!-- One mode setting: send-tick, label, the modes the camera offers. -->
+    <DataTemplate DataType="inf:ModeSetting">
+      <Grid ColumnDefinitions="Auto,170,*" Margin="0,1">
+        <CheckBox Grid.Column="0" IsChecked="{Binding Change}" IsEnabled="{Binding IsAvailable}" />
+        <TextBlock Grid.Column="1" Text="{Binding Label}" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="2" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" Width="200"
+                  IsEnabled="{Binding IsAvailable}" PlaceholderText="not reported" />
+      </Grid>
+    </DataTemplate>
+  </UserControl.DataTemplates>
 
   <Panel Margin="8">
 
@@ -10,51 +35,115 @@
       <TextBlock Classes="hint" Text="{Binding UnavailableReason}" />
     </Border>
 
-    <StackPanel IsVisible="{Binding IsAvailable}" Spacing="6" MaxWidth="700" HorizontalAlignment="Left">
+    <DockPanel IsVisible="{Binding IsAvailable}">
 
-      <TextBlock Classes="section" Text="Picture" />
-      <TextBlock Classes="hint" Text="{Binding SourceLabel}" />
-
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Button Content="Reload" Command="{Binding LoadSettingsCommand}"
-                ToolTip.Tip="Read the current values from the camera again." />
-        <Button Content="Apply ticked" Command="{Binding ApplyCommand}" />
+      <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,6">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="section" Text="Picture" VerticalAlignment="Center" />
+          <TextBlock Classes="hint" Text="{Binding SourceLabel}" VerticalAlignment="Center" />
+          <Button Content="Reload" Command="{Binding LoadSettingsCommand}"
+                  ToolTip.Tip="Read the current values from the camera again." />
+          <Button Content="Apply ticked" Command="{Binding ApplyCommand}"
+                  ToolTip.Tip="Sends every ticked row on every page below in one request." />
+          <TextBlock Classes="hint" Text="{Binding StatusText}" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Classes="hint" TextWrapping="Wrap"
+                   Text="Only ticked rows are sent; moving a slider or picking a mode ticks its row. The library treats an omitted value as &quot;leave unchanged&quot; and does its own read-modify-write. A disabled row means the camera reported no range or no modes for it." />
       </StackPanel>
-      <TextBlock Classes="hint" Text="{Binding StatusText}" />
 
-      <TextBlock Classes="section" Text="Settings" />
-      <TextBlock Classes="hint"
-                 Text="Only ticked settings are sent. The library treats an omitted value as &quot;leave unchanged&quot; and does its own read-modify-write, so re-sending everything would be a way to overwrite something you never meant to touch." />
+      <TabControl>
 
-      <Grid ColumnDefinitions="Auto,120,*,90" RowDefinitions="Auto,Auto,Auto,Auto" >
-        <CheckBox Grid.Row="0" Grid.Column="0" IsChecked="{Binding ChangeBrightness}" IsEnabled="{Binding HasBrightness}" />
-        <TextBlock Grid.Row="0" Grid.Column="1" Text="Brightness" VerticalAlignment="Center" />
-        <Slider Grid.Row="0" Grid.Column="2" Value="{Binding Brightness}"
-                Minimum="{Binding BrightnessMin}" Maximum="{Binding BrightnessMax}" IsEnabled="{Binding HasBrightness}" />
-        <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding Brightness, StringFormat='{}{0:0.##}'}" VerticalAlignment="Center" />
+        <TabItem Header="Picture">
+          <StackPanel Spacing="2" MaxWidth="760" HorizontalAlignment="Left" Margin="0,6,0,0">
+            <ItemsControl ItemsSource="{Binding Picture}" />
+            <ContentControl Content="{Binding IrCutFilter}" />
+            <TextBlock Classes="hint" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Text="IR cut ON is day mode (filter in, colour), OFF is night mode (filter out, IR-sensitive monochrome), AUTO lets the camera switch on light level. Turn on the live view on the Focus page or the Media tab to watch a change take effect." />
+          </StackPanel>
+        </TabItem>
 
-        <CheckBox Grid.Row="1" Grid.Column="0" IsChecked="{Binding ChangeContrast}" IsEnabled="{Binding HasContrast}" />
-        <TextBlock Grid.Row="1" Grid.Column="1" Text="Contrast" VerticalAlignment="Center" />
-        <Slider Grid.Row="1" Grid.Column="2" Value="{Binding Contrast}"
-                Minimum="{Binding ContrastMin}" Maximum="{Binding ContrastMax}" IsEnabled="{Binding HasContrast}" />
-        <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding Contrast, StringFormat='{}{0:0.##}'}" VerticalAlignment="Center" />
+        <TabItem Header="Exposure">
+          <StackPanel Spacing="2" MaxWidth="760" HorizontalAlignment="Left" Margin="0,6,0,0">
+            <ContentControl Content="{Binding ExposureMode}" />
+            <ContentControl Content="{Binding ExposurePriority}" />
+            <ItemsControl ItemsSource="{Binding Exposure}" />
+            <TextBlock Classes="hint" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Text="In AUTO the min/max values bound what auto-exposure may choose; in MANUAL the exposure time, gain and iris are used as they are. Many cameras refuse MANUAL unless those three are sent with it." />
+          </StackPanel>
+        </TabItem>
 
-        <CheckBox Grid.Row="2" Grid.Column="0" IsChecked="{Binding ChangeSaturation}" IsEnabled="{Binding HasSaturation}" />
-        <TextBlock Grid.Row="2" Grid.Column="1" Text="Colour saturation" VerticalAlignment="Center" />
-        <Slider Grid.Row="2" Grid.Column="2" Value="{Binding Saturation}"
-                Minimum="{Binding SaturationMin}" Maximum="{Binding SaturationMax}" IsEnabled="{Binding HasSaturation}" />
-        <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding Saturation, StringFormat='{}{0:0.##}'}" VerticalAlignment="Center" />
+        <TabItem Header="White balance · WDR · BLC">
+          <StackPanel Spacing="2" MaxWidth="760" HorizontalAlignment="Left" Margin="0,6,0,0">
+            <ContentControl Content="{Binding WhiteBalanceMode}" />
+            <ItemsControl ItemsSource="{Binding WhiteBalance}" />
+            <Separator Margin="0,6" />
+            <ContentControl Content="{Binding WdrMode}" />
+            <ContentControl Content="{Binding WdrLevel}" />
+            <Separator Margin="0,6" />
+            <ContentControl Content="{Binding BlcMode}" />
+            <ContentControl Content="{Binding BlcLevel}" />
+            <TextBlock Classes="hint" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Text="The Cr/Cb gains only apply in MANUAL white balance. The camera reports their ranges as Yr/Yb — the same two gains under the schema's other name." />
+          </StackPanel>
+        </TabItem>
 
-        <CheckBox Grid.Row="3" Grid.Column="0" IsChecked="{Binding ChangeSharpness}" IsEnabled="{Binding HasSharpness}" />
-        <TextBlock Grid.Row="3" Grid.Column="1" Text="Sharpness" VerticalAlignment="Center" />
-        <Slider Grid.Row="3" Grid.Column="2" Value="{Binding Sharpness}"
-                Minimum="{Binding SharpnessMin}" Maximum="{Binding SharpnessMax}" IsEnabled="{Binding HasSharpness}" />
-        <TextBlock Grid.Row="3" Grid.Column="3" Text="{Binding Sharpness, StringFormat='{}{0:0.##}'}" VerticalAlignment="Center" />
-      </Grid>
+        <TabItem Header="Focus">
+          <Grid ColumnDefinitions="440,12,*" Margin="0,6,0,0">
+            <ScrollViewer Grid.Column="0">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="section" Text="Configuration" />
+                <ContentControl Content="{Binding FocusMode}" />
+                <ItemsControl ItemsSource="{Binding FocusConfiguration}" />
+                <TextBlock Classes="hint" TextWrapping="Wrap"
+                           Text="Sent with Apply ticked, like every other page." />
 
-      <TextBlock Classes="hint"
-                 Text="A disabled row means the camera reported no range for that setting. Turn on the live snapshot on the Media tab to watch a change take effect." />
+                <TextBlock Classes="section" Text="Move the lens" Margin="0,10,0,0" />
+                <TextBlock Classes="hint" Text="{Binding FocusOptionsText}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding FocusStatusText}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300" />
+                  <Button Content="Refresh" Command="{Binding LoadFocusStatusCommand}" />
+                </StackPanel>
 
-    </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Speed" VerticalAlignment="Center" Width="70" />
+                  <NumericUpDown Value="{Binding FocusSpeed}" Minimum="0" Maximum="{Binding FocusSpeedMax}"
+                                 Increment="0.1" FormatString="0.##" Width="110" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding CanFocusContinuous}">
+                  <TextBlock Text="Hold" VerticalAlignment="Center" Width="70" />
+                  <Button x:Name="FocusNearHold" Content="◀ Near" Tag="-1"
+                          ToolTip.Tip="Focus moves towards near for as long as the button is held." />
+                  <Button x:Name="FocusFarHold" Content="Far ▶" Tag="1"
+                          ToolTip.Tip="Focus moves towards far for as long as the button is held." />
+                  <Button Content="Stop" Command="{Binding StopFocusCommand}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding CanFocusRelative}">
+                  <TextBlock Text="Step" VerticalAlignment="Center" Width="70" />
+                  <NumericUpDown Value="{Binding FocusStep}" Minimum="0" Maximum="{Binding FocusStepMax}"
+                                 Increment="0.01" FormatString="0.###" Width="110" />
+                  <Button Content="Near" Command="{Binding FocusStepNearCommand}" />
+                  <Button Content="Far" Command="{Binding FocusStepFarCommand}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" IsEnabled="{Binding CanFocusAbsolute}">
+                  <TextBlock Text="Position" VerticalAlignment="Center" Width="70" />
+                  <NumericUpDown Value="{Binding FocusTarget}" Minimum="{Binding FocusPositionMin}"
+                                 Maximum="{Binding FocusPositionMax}" Increment="0.01" FormatString="0.###" Width="110" />
+                  <Button Content="Go" Command="{Binding FocusGoToCommand}" />
+                </StackPanel>
+
+                <TextBlock Classes="hint" TextWrapping="Wrap"
+                           Text="Rows the camera does not support stay disabled. Many cameras ignore lens moves while auto focus is on — set it to MANUAL first." />
+              </StackPanel>
+            </ScrollViewer>
+
+            <views:VideoView Grid.Column="2" DataContext="{Binding Video}" />
+          </Grid>
+        </TabItem>
+
+      </TabControl>
+    </DockPanel>
   </Panel>
 </UserControl>

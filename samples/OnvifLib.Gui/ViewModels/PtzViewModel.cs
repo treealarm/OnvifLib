@@ -7,7 +7,7 @@ using OnvifLib.Gui.Models;
 namespace OnvifLib.Gui.ViewModels;
 
 /// <summary>PTZ: continuous, relative and absolute movement, plus presets.</summary>
-public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger)
+public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger, IDialogService dialogs)
   : TabViewModelBase("PTZ", runner, logger)
 {
   // Guards the press-and-hold path, which deliberately does not go through a RelayCommand: the
@@ -80,6 +80,7 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
     Profile ??= Session.Media?.GetProfiles().FirstOrDefault();
     await LoadCapabilitiesAsync();
     await LoadPresetsAsync();
+    await LoadNodesAsync();
   }
 
   protected override void OnCleared()
@@ -88,6 +89,7 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
     Profile = null;
     CanAbsolute = CanRelative = CanContinuous = false;
     Hint = "";
+    ClearNode();
   }
 
   /// <summary>Kept in step with the Media tab, since PTZ is addressed by media profile.</summary>
@@ -222,7 +224,9 @@ public sealed partial class PtzViewModel(OperationRunner runner, UiLogger logger
   private async Task GotoPresetAsync()
   {
     if (!TryGetTarget(out var ptz, out var profileToken) || SelectedPreset is not { } preset) return;
-    await Runner.RunAsync($"GotoPreset [{preset.Name}]", () => ptz.GotoPresetAsync(profileToken, preset.Token));
+    // The speed slider applies here too; a preset recall at full speed is a lurch on a long lens.
+    await Runner.RunAsync($"GotoPreset [{preset.Name}]",
+      () => ptz.GotoPresetAsync(profileToken, preset.Token, (float)Speed, (float)Speed));
   }
 
   [RelayCommand]

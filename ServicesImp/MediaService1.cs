@@ -4,7 +4,7 @@ using MediaServiceReference1;
 
 namespace OnvifLib
 {
-  public class MediaService1 : MediaService
+  public partial class MediaService1 : MediaService
   {
     private MediaClient? _mediaClient1;
     private List<Profile> _profiles = new();
@@ -61,7 +61,12 @@ namespace OnvifLib
         Width: p.VideoEncoderConfiguration?.Resolution?.Width ?? 0,
         Height: p.VideoEncoderConfiguration?.Resolution?.Height ?? 0,
         Encoding: p.VideoEncoderConfiguration?.Encoding.ToString() ?? string.Empty,
-        VideoSourceToken: p.VideoSourceConfiguration?.token ?? string.Empty
+        // SourceToken, not token: the configuration's own token is what OSDs hang off, while
+        // Imaging is addressed by the physical source behind it. Media2 always got this right;
+        // Media1 used to hand Imaging the configuration token, which only worked on cameras
+        // that happen to name both the same.
+        VideoSourceToken: p.VideoSourceConfiguration?.SourceToken ?? string.Empty,
+        VideoSourceConfigToken: p.VideoSourceConfiguration?.token ?? string.Empty
       )).ToList();
     }
     public override async Task<List<OnvifVideoEncoderConfig>> GetVideoEncoderConfigsAsync()

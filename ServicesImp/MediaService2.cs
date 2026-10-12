@@ -7,7 +7,7 @@ using PtzServiceReference;
 
 namespace OnvifLib
 {
-  public class MediaService2 : MediaService
+  public partial class MediaService2 : MediaService
   {
     private Media2Client? _mediaClient2;
     private List<MediaProfile> _profiles = new();
@@ -67,7 +67,8 @@ namespace OnvifLib
         Width: p.Configurations?.VideoEncoder?.Resolution?.Width ?? 0,
         Height: p.Configurations?.VideoEncoder?.Resolution?.Height ?? 0,
         Encoding: p.Configurations?.VideoEncoder?.Encoding ?? string.Empty,
-        VideoSourceToken: p.Configurations?.VideoSource?.SourceToken ?? string.Empty
+        VideoSourceToken: p.Configurations?.VideoSource?.SourceToken ?? string.Empty,
+        VideoSourceConfigToken: p.Configurations?.VideoSource?.token ?? string.Empty
       )).ToList();
     }
     public override async Task<List<OnvifVideoEncoderConfig>> GetVideoEncoderConfigsAsync()

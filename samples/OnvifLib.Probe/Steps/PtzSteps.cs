@@ -59,11 +59,39 @@ public static class PtzSteps
     await r.StepAsync("GetPresets", () => ptz.GetPresetsAsync(profile.Token),
       presets => r.Table(["token", "name"], presets.Select(p => new List<object?> { p.Token, p.Name })));
 
+    // GetNodes swallows its own failure and returns an empty list, so an empty answer is
+    // reported as a failure here rather than as a camera with no nodes.
+    var nodes = await r.StepAsync("GetNodes",
+      async () => await ptz.GetNodesAsync() is { Count: > 0 } list
+        ? list
+        : throw new ProbeFailure("the camera reported no PTZ nodes (or would not answer — see stderr)"),
+      list =>
+      {
+        r.Table(["token", "name", "home", "fixed home", "max presets", "tours", "aux commands"],
+          list.Select(n => new List<object?>
+          {
+            n.Token, n.Name, n.HomeSupported, n.FixedHomePosition, n.MaximumNumberOfPresets,
+            n.MaximumNumberOfPresetTours == 0 ? "—" : n.MaximumNumberOfPresetTours,
+            n.AuxiliaryCommands.Count == 0 ? "—" : string.Join(", ", n.AuxiliaryCommands),
+          }));
+        var first = list[0];
+        r.Values(
+          ("abs pan/tilt spaces", first.AbsolutePanTiltSpaces.Count),
+          ("abs zoom spaces", first.AbsoluteZoomSpaces.Count),
+          ("rel pan/tilt spaces", first.RelativePanTiltSpaces.Count),
+          ("rel zoom spaces", first.RelativeZoomSpaces.Count),
+          ("cont pan/tilt spaces", first.ContinuousPanTiltSpaces.Count),
+          ("cont zoom spaces", first.ContinuousZoomSpaces.Count));
+      });
+    var node = nodes?.FirstOrDefault();
+
     if (!ctx.Options.AllowWrites)
     {
       r.SkipWrites(
         "ContinuousMove + Stop", "AbsoluteMove (there and back)",
-        "RelativeMove (there and back)", "SetPreset / GotoPreset / RemovePreset");
+        "RelativeMove (there and back)", "SetPreset / GotoPreset / RemovePreset",
+        "GotoHomePosition (there and back)");
+      SkipNeverRun(r, node);
       return;
     }
 
@@ -71,6 +99,95 @@ public static class PtzSteps
     await AbsoluteAsync(ctx, ptz, profile.Token, caps, status);
     await RelativeAsync(ctx, ptz, profile.Token, caps);
     await PresetCycleAsync(ctx, ptz, profile.Token);
+    await GotoHomeAsync(ctx, ptz, profile.Token, caps, node);
+    SkipNeverRun(r, node);
+  }
+
+  /// <summary>Lists what the probe will not do at any flag level, naming the node's own commands.</summary>
+  private static void SkipNeverRun(ProbeRunner r, PtzNodeInfo? node)
+  {
+    // SetHomePosition replaces the stored home with no way to read the old one back first.
+    r.SkipDestructive("SetHomePosition");
+    if (node is { AuxiliaryCommands.Count: > 0 } n)
+      r.Skip("SendAuxiliaryCommand (PTZ)", $"drives hardware — one of [{string.Join(", ", n.AuxiliaryCommands)}]");
+    else
+      r.SkipDestructive("SendAuxiliaryCommand (PTZ)");
+  }
+
+  /// <summary>
+  /// Goes home and comes back. The way back is an absolute move to the recorded position when
+  /// the camera has one, and otherwise a preset stored at the starting point and removed after —
+  /// so the step also works on heads that only move continuously.
+  /// </summary>
+  private static async Task GotoHomeAsync(ProbeContext ctx, PtzService2 ptz, string profileToken,
+    PtzCapabilities? caps, PtzNodeInfo? node)
+  {
+    var r = ctx.Runner;
+    const string name = "GotoHomePosition (there and back)";
+    if (node is null) { r.Skip(name, "no PTZ node to ask whether home is supported"); return; }
+    if (!node.HomeSupported) { r.Skip(name, "the node reports no home position"); return; }
+
+    var start = await ptz.GetStatusAsync(profileToken);
+    if (caps is { AbsoluteMove: true } && start is not null)
+    {
+      await r.StepAsync($"{name} via AbsoluteMove", async () =>
+      {
+        try
+        {
+          await ptz.GotoHomePositionAsync(profileToken, 0.5f, 0.5f);
+          var home = await SettleAsync(ptz, profileToken, ctx.Cancellation);
+          r.Values(("home pan", home?.Pan), ("home tilt", home?.Tilt), ("home zoom", home?.Zoom));
+        }
+        finally
+        {
+          await ptz.AbsoluteMoveAsync(profileToken, start.Pan, start.Tilt, start.Zoom);
+          await SettleAsync(ptz, profileToken, ctx.Cancellation);
+        }
+      });
+      return;
+    }
+
+    var marker = $"onviflib-home-{DateTime.Now:HHmmss}";
+    await r.StepAsync($"{name} via a temporary preset", async () =>
+    {
+      var token = await ptz.SetPresetAsync(profileToken, marker, "");
+      try
+      {
+        await ptz.GotoHomePositionAsync(profileToken, 0.5f, 0.5f);
+        await SettleAsync(ptz, profileToken, ctx.Cancellation);
+      }
+      finally
+      {
+        try
+        {
+          if (string.IsNullOrEmpty(token))
+            token = (await ptz.GetPresetsAsync(profileToken)).FirstOrDefault(p => p.Name == marker)?.Token ?? "";
+          if (!string.IsNullOrEmpty(token))
+          {
+            await ptz.GotoPresetAsync(profileToken, token, 0.5f, 0.5f);
+            await SettleAsync(ptz, profileToken, ctx.Cancellation);
+          }
+        }
+        finally
+        {
+          if (!string.IsNullOrEmpty(token)) await ptz.RemovePresetAsync(profileToken, token);
+        }
+      }
+    });
+  }
+
+  /// <summary>Waits for the head to report it has stopped, giving up after a few seconds.</summary>
+  private static async Task<PtzStatus?> SettleAsync(PtzService2 ptz, string profileToken, CancellationToken ct)
+  {
+    var until = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+    PtzStatus? status;
+    do
+    {
+      await Task.Delay(300, ct);
+      status = await ptz.GetStatusAsync(profileToken);
+    }
+    while (status is { Moving: true } && DateTime.UtcNow < until);
+    return status;
   }
 
   private static async Task ContinuousAsync(ProbeContext ctx, PtzService2 ptz, string profileToken, PtzCapabilities? caps)
@@ -183,7 +300,7 @@ public static class PtzSteps
       if (token is null) return;
 
       // Safe: the preset was just stored at the current position, so going to it does not move.
-      await r.StepAsync($"GotoPreset [{token}]", () => ptz.GotoPresetAsync(profileToken, token));
+      await r.StepAsync($"GotoPreset [{token}] (speed 0.5)", () => ptz.GotoPresetAsync(profileToken, token, 0.5f, 0.5f));
     }
     finally
     {

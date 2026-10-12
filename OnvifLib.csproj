@@ -7,17 +7,17 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
     <PackageId>OnvifLib</PackageId>
-    <Version>1.1.1</Version>
+    <Version>1.2.0</Version>
     <Authors>Danil Serov</Authors>
     <Company>TreeAlarm</Company>
     <Copyright>Copyright (c) TreeAlarm</Copyright>
-    <Description>A modern .NET library for ONVIF-compliant IP cameras: device discovery, media profiles and RTSP URIs, PTZ, imaging, events (PullPoint), analytics modules and rules with Profile M metadata, Profile G edge recordings, and device I/O.</Description>
+    <Description>A modern .NET library for ONVIF-compliant IP cameras: device discovery, media profiles and RTSP URIs, OSD, PTZ with home and auxiliary commands, imaging with exposure, white balance, day/night and focus control, events (PullPoint with topic filters), device administration (users, network, NTP/DNS, time zone, scopes), analytics modules and rules with Profile M metadata, Profile G edge recordings, jobs and event search, and device I/O.</Description>
     <!-- Terms someone would actually search nuget.org for, not a restatement of the title. -->
     <PackageTags>onvif;ip-camera;cctv;video-surveillance;ptz;rtsp;discovery;ws-discovery;profile-g;profile-m;analytics;soap</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>Targets .NET 10. Previous releases targeted .NET 8; consumers on .NET 8 or 9 must stay on 1.0.10. Analytics modules and rules now expose structured parameters as OnvifElementItem (name plus raw XML) instead of a bare XML list, so a Modify can round-trip them without renaming the parameter. Adds two runnable samples: a console probe that exercises the whole public API against a camera, and a cross-platform Avalonia test bench.</PackageReleaseNotes>
+    <PackageReleaseNotes>1.2.0: Cameras that do not answer GetServices (ONVIF 1.x/2.0) are now reached through GetCapabilities (Camera.UsedCapabilitiesFallback says which). Events: GetEventProperties, GetServiceCapabilities, SetSynchronizationPoint and topic filters (EventService1.SetTopicFilterAsync). Imaging: IR cut filter, exposure, white balance, WDR, backlight compensation and focus configuration, plus focus moves and status. PTZ: home position, nodes, auxiliary commands and a speed for GotoPreset. Device administration on Camera: users, date/time mode and time zone, network interfaces, DNS, NTP, hostname, protocols, gateway and discovery scopes. Media: OSD and video source configurations. Profile G: recording options, creating recordings, tracks and jobs, job configuration and state, and FindEvents. OnvifImagingSettings, OnvifImagingOptions and OnvifProfileInfo gained optional trailing members — source-compatible, but consumers must recompile. Fixes: Media1 profiles now report the physical video source in VideoSourceToken (it was the configuration token, which Imaging rejects on cameras where the two differ; the configuration token is now VideoSourceConfigToken); SetTimeAsync keeps the camera time zone and DST flag instead of clearing them.</PackageReleaseNotes>
 
     <!-- XML docs ship with the package so consumers get IntelliSense on the public API. CS1591
          ("missing XML comment") is suppressed rather than chased: most of the public surface is

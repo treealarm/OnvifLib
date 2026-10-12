@@ -81,6 +81,8 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
     Tracks.Clear();
     ReplayUri = "";
     CapabilitiesText = SummaryText = ReplayCapabilitiesText = "not read";
+    ClearJobs();
+    ClearEvents();
     _ = Video?.StopInternalAsync();
   }
 
@@ -89,6 +91,8 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
     _searchCancellation?.Cancel();
     if (Video is not null) await Video.StopInternalAsync();
   }
+
+  private static bool IsPlaceholder(DateTime t) => t.Year < 2005 || t.Year >= 2038;
 
   private static string Describe(TimeSpan offset) => offset == TimeSpan.Zero
     ? "clock offset is zero (or was never measured) — searches use this machine's clock"
@@ -108,14 +112,24 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
 
     var (okCaps, caps) = await Runner.RunAsync("GetServiceCapabilities (recording)", recording.GetServiceCapabilitiesAsync);
     if (okCaps)
+    {
       CapabilitiesText = $"dynamic recordings: {(caps.DynamicRecordings ? "yes" : "no")}, " +
                          $"dynamic tracks: {(caps.DynamicTracks ? "yes" : "no")}, max {caps.MaxRecordings}";
+      DynamicRecordings = caps.DynamicRecordings;
+      DynamicTracks = caps.DynamicTracks;
+    }
+
+    // Selections survive a reload, so a command that refreshes the lists after a write does not
+    // leave the next command (Delete job, say) with nothing selected and nothing to do.
+    var keepRecording = SelectedRecording?.RecordingToken;
+    var keepJob = SelectedJob?.JobToken;
 
     var (ok, list) = await Runner.RunAsync("GetRecordings", recording.GetRecordingsAsync);
     if (ok && list is not null)
     {
       Recordings.Clear();
       foreach (var item in list) Recordings.Add(item);
+      SelectedRecording = Recordings.FirstOrDefault(r => r.RecordingToken == keepRecording);
     }
 
     var (okJobs, jobs) = await Runner.RunAsync("GetRecordingJobs", recording.GetRecordingJobsAsync);
@@ -123,6 +137,7 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
     {
       Jobs.Clear();
       foreach (var job in jobs) Jobs.Add(job);
+      SelectedJob = Jobs.FirstOrDefault(j => j.JobToken == keepJob);
     }
   }
 
@@ -177,8 +192,11 @@ public sealed partial class RecordingViewModel(OperationRunner runner, UiLogger 
 
     // The camera's own window is a far better starting point than an arbitrary "last day",
     // converted back into our clock because that is what the pickers show.
-    if (summary.DataFrom is { } from) FromDate = new DateTimeOffset(ToOurClock(from), TimeSpan.Zero).ToLocalTime();
-    if (summary.DataUntil is { } until) ToDate = new DateTimeOffset(ToOurClock(until), TimeSpan.Zero).ToLocalTime();
+    // Many cameras answer with placeholders — the Unix epoch and the last second of 32-bit time —
+    // instead of the real span, and the same cameras refuse those as a FindEvents window. Such a
+    // bound is left at its default rather than copied into the pickers.
+    if (summary.DataFrom is { } from && !IsPlaceholder(from)) FromDate = new DateTimeOffset(ToOurClock(from), TimeSpan.Zero).ToLocalTime();
+    if (summary.DataUntil is { } until && !IsPlaceholder(until)) ToDate = new DateTimeOffset(ToOurClock(until), TimeSpan.Zero).ToLocalTime();
   }
 
   [RelayCommand]

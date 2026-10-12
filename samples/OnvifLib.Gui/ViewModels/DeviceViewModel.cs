@@ -39,6 +39,9 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
   [ObservableProperty] private string _auxiliaryResponse = "";
 
   public ObservableCollection<ServiceEntry> Services { get; } = [];
+
+  /// <summary>Where the service list came from — GetServices, or the legacy GetCapabilities.</summary>
+  [ObservableProperty] private string _servicesSource = "";
   public ObservableCollection<OnvifEdgeStorageConfiguration> StorageConfigurations { get; } = [];
   public ObservableCollection<string> AuxiliaryCommands { get; } = [];
 
@@ -49,6 +52,7 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
     Services.Clear();
     foreach (var (ns, xaddr) in session.Services.OrderBy(kv => kv.Key))
       Services.Add(new ServiceEntry(ns, xaddr));
+    ServicesSource = DescribeServicesSource(session.Camera);
 
     ApplyDeviceInfo(session.DeviceInfo);
 
@@ -69,6 +73,11 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
     await PingAsync();
     await ReadStorageSupportAsync();
     await ReadStorageConfigurationsAsync();
+    // Clock and scopes are cheap reads any account may make. Users and network are left to their
+    // Refresh buttons: GetUsers is refused to non-administrators, and an error in the status bar
+    // on every visit to this tab would bury the ones that matter.
+    await LoadSystemDateTimeAsync();
+    await LoadScopesAsync();
   }
 
   protected override void OnCleared()
@@ -82,6 +91,8 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
     ClockText = "not measured";
     StorageSupportText = "not read";
     AuxiliaryResponse = "";
+    ClearAdministration();
+    ClearNetwork();
   }
 
   private void ApplyDeviceInfo(OnvifDeviceInfo? info)
@@ -123,6 +134,7 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
 
     Services.Clear();
     foreach (var (ns, xaddr) in services.OrderBy(kv => kv.Key)) Services.Add(new ServiceEntry(ns, xaddr));
+    ServicesSource = DescribeServicesSource(session.Camera);
   }
 
   [RelayCommand]
@@ -232,4 +244,10 @@ public sealed partial class DeviceViewModel(OperationRunner runner, UiLogger log
       () => session.Camera.SendAuxiliaryCommandAsync(command));
     if (ok) AuxiliaryResponse = response ?? "";
   }
+
+  // A list from GetCapabilities can only name the services that call knew about — Media2 never
+  // appears in it — so the reader needs to know which one they are looking at.
+  private static string DescribeServicesSource(Camera camera) => camera.UsedCapabilitiesFallback
+    ? "from GetCapabilities — the camera does not answer GetServices (ONVIF 1.x/2.0)"
+    : "from GetServices";
 }

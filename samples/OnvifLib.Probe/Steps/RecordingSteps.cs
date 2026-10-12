@@ -10,6 +10,9 @@ namespace OnvifLib.Probe.Steps;
 /// </remarks>
 public static class RecordingSteps
 {
+  /// <summary>How many FindEvents results are printed before the rest are only counted.</summary>
+  private const int ListedEvents = 20;
+
   public static async Task RunAsync(ProbeContext ctx)
   {
     var r = ctx.Runner;
@@ -27,9 +30,37 @@ public static class RecordingSteps
 
     var recordingTokens = await RecordingServiceAsync(ctx);
     var searched = await SearchAsync(ctx, recordingTokens);
+    await RecordingOptionsAsync(ctx, searched ?? recordingTokens);
     await ReplayAsync(ctx, searched ?? recordingTokens);
 
     r.SkipDestructive("SetRecordingConfiguration", "SetRecordingJobMode", "DeleteRecording", "DeleteTrack", "DeleteRecordingJob");
+    // Creating recordings, tracks or jobs claims storage and, for an Active job, starts writing.
+    r.SkipDestructive("CreateRecording", "CreateTrack", "CreateRecordingJob", "SetRecordingJobConfiguration");
+  }
+
+  /// <summary>
+  /// Asked after the search because a camera can list its recordings only through Search —
+  /// GetRecordings coming back empty while FindRecordings finds one is a real combination.
+  /// </summary>
+  private static async Task RecordingOptionsAsync(ProbeContext ctx, List<string> recordingTokens)
+  {
+    var r = ctx.Runner;
+    if (ctx.Recording is not { } recording) return;
+    if (recordingTokens.FirstOrDefault() is not { } first)
+    {
+      r.Skip("GetRecordingOptions", "no recording to ask about");
+      return;
+    }
+    await r.StepAsync($"GetRecordingOptions [{first}]",
+      async () => await recording.GetRecordingOptionsAsync(first)
+                  ?? throw new ProbeFailure("the camera returned no options for this recording"),
+      o => r.Values(
+        ("spare jobs", o.JobSpare),
+        ("compatible sources", o.CompatibleSources.Count == 0 ? "—" : string.Join(", ", o.CompatibleSources)),
+        ("spare tracks", o.TrackSpareTotal),
+        ("spare video", o.TrackSpareVideo),
+        ("spare audio", o.TrackSpareAudio),
+        ("spare metadata", o.TrackSpareMetadata)));
   }
 
   private static async Task<List<string>> RecordingServiceAsync(ProbeContext ctx)
@@ -53,9 +84,37 @@ public static class RecordingSteps
         list.Select(c => new List<object?> { c.RecordingToken, c.SourceName, c.Content, c.MaximumRetentionTime })));
     if (recordings is not null) tokens.AddRange(recordings.Select(x => x.RecordingToken));
 
-    await r.StepAsync("GetRecordingJobs", recording.GetRecordingJobsAsync,
+    var jobs = await r.StepAsync("GetRecordingJobs", recording.GetRecordingJobsAsync,
       list => r.Table(["job", "recording", "mode", "source"],
         list.Select(j => new List<object?> { j.JobToken, j.RecordingToken, j.Mode, j.SourceToken })));
+
+    if (jobs?.FirstOrDefault() is { } job)
+    {
+      await r.StepAsync($"GetRecordingJobConfiguration [{job.JobToken}]",
+        async () => await recording.GetRecordingJobConfigurationAsync(job.JobToken)
+                    ?? throw new ProbeFailure("the camera returned no configuration for this job"),
+        c => r.Values(
+          ("recording", c.RecordingToken),
+          ("mode", c.Mode),
+          ("priority", c.Priority),
+          ("sources", string.Join(", ", c.Sources.Select(src => $"{src.SourceToken} ({src.SourceType ?? "default type"})")))));
+
+      // State is what the job is doing, which can differ from its mode: Active with a full card
+      // reads back as Error here.
+      await r.StepAsync($"GetRecordingJobState [{job.JobToken}]",
+        async () => await recording.GetRecordingJobStateAsync(job.JobToken)
+                    ?? throw new ProbeFailure("the camera returned no state for this job"),
+        st => r.Table(["source", "state", "track", "track state", "error"],
+          st.Sources.SelectMany(src => src.Tracks.Count == 0
+            ? [new List<object?> { src.SourceToken, src.State, null, null, null }]
+            : src.Tracks.Select(t => new List<object?> { src.SourceToken, src.State, t.SourceTag, t.State, t.Error }))
+          .Prepend(new List<object?> { "(job)", st.State, null, null, null })));
+    }
+    else
+    {
+      r.Skip("GetRecordingJobConfiguration", "no recording jobs");
+      r.Skip("GetRecordingJobState", "no recording jobs");
+    }
 
     if (tokens.FirstOrDefault() is { } first)
       await r.StepAsync($"GetRecordingConfiguration [{first}]",
@@ -120,6 +179,25 @@ public static class RecordingSteps
       intervals => r.Table(["recording", "track", "from (camera)", "until (camera)", "from (ours)"],
         intervals.Select(i => new List<object?>
           { i.RecordingToken, i.TrackToken, i.From, i.Until, ctx.ToLocalClock(i.From) })));
+
+    // The summary bounds are often placeholders — the Unix epoch and the last second of 32-bit
+    // time — and cameras that report them happily can still refuse them as a FindEvents window.
+    // The real span is what the recordings themselves cover.
+    static bool Placeholder(DateTime t) => t.Year < 2005 || t.Year >= 2038;
+    var eventsTo = Placeholder(to) ? ctx.ToCameraClock(DateTime.UtcNow) : to;
+    var earliest = found.Select(x => x.EarliestRecording).OfType<DateTime>().Where(t => !Placeholder(t)).DefaultIfEmpty(eventsTo).Min();
+    var eventsFrom = Placeholder(from) ? new[] { earliest, eventsTo.AddDays(-1) }.Min() : from;
+
+    await r.StepAsync($"FindEvents {eventsFrom:yyyy-MM-dd HH:mm} .. {eventsTo:yyyy-MM-dd HH:mm} (camera clock)",
+      () => search.FindEventsAsync(eventsFrom, eventsTo, null, includeStartState: true, ctx.Options.MaxResults, ctx.Cancellation),
+      events =>
+      {
+        r.Value("events", events.Count);
+        r.Table(["time (camera)", "time (ours)", "topic", "track", "start state", "data"],
+          events.Take(ListedEvents).Select(e => new List<object?>
+            { e.Time, ctx.ToLocalClock(e.Time), e.Topic, e.TrackToken, e.StartStateEvent, e.Summary }));
+        if (events.Count > ListedEvents) r.Note($"{events.Count - ListedEvents} further event(s) not shown");
+      });
 
     var tokens = found.Select(x => x.RecordingToken).ToList();
     if (tokens.FirstOrDefault() is { } first)

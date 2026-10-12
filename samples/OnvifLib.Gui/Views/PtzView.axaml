@@ -13,7 +13,8 @@
 
     <Grid IsVisible="{Binding IsAvailable}" ColumnDefinitions="Auto,12,*">
 
-      <StackPanel Grid.Column="0" Spacing="4" Width="340">
+      <ScrollViewer Grid.Column="0">
+      <StackPanel Spacing="4" Width="340">
         <Border Classes="banner" IsVisible="{Binding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
           <TextBlock Classes="hint error" Text="{Binding Hint}" />
         </Border>
@@ -65,7 +66,25 @@
           <NumericUpDown Value="{Binding AbsoluteZoom}" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.00" Width="80" />
           <Button Content="Move" Command="{Binding AbsoluteMoveCommand}" />
         </StackPanel>
+
+        <TextBlock Classes="section" Text="Home &amp; auxiliary" />
+        <TextBlock Classes="hint" Text="{Binding NodeText}" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="6" IsEnabled="{Binding HasProfile}">
+          <Button Content="Go home" Command="{Binding GotoHomeCommand}" IsEnabled="{Binding HomeSupported}"
+                  ToolTip.Tip="Uses the speed slider above." />
+          <Button Content="Set home here" Command="{Binding SetHomeCommand}" IsEnabled="{Binding CanSetHome}"
+                  ToolTip.Tip="Replaces the stored home with the current position. Asks first." />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6" IsEnabled="{Binding HasProfile}">
+          <ComboBox ItemsSource="{Binding AuxiliaryCommands}" SelectedItem="{Binding SelectedAuxiliaryCommand}"
+                    Width="130" PlaceholderText="none reported" />
+          <TextBox Text="{Binding AuxiliaryCommand}" Width="120" Watermark="tt:Wiper|On" />
+          <Button Content="Send" Command="{Binding SendAuxiliaryCommandCommand}"
+                  ToolTip.Tip="Drives hardware on the camera. Asks first." />
+        </StackPanel>
+        <TextBlock Classes="hint mono" Text="{Binding AuxiliaryResponse}" TextWrapping="Wrap" />
       </StackPanel>
+      </ScrollViewer>
 
       <Grid Grid.Column="2" RowDefinitions="1.2*,8,*">
         <Border Grid.Row="0" BorderBrush="#33808080" BorderThickness="1">

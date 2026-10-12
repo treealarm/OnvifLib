@@ -9,7 +9,7 @@ using DeviceServiceReference;
 using EventServiceReference1;
 using OnvifLib;
 
-public class Camera
+public partial class Camera
 {
   private readonly string _url;
   private readonly string _username;
@@ -84,20 +84,7 @@ public class Camera
       );
 
     var deviceSystemDateTime = await deviceClient.GetSystemDateAndTimeAsync();
-
-    if (deviceSystemDateTime.UTCDateTime == null)
-      return null;
-
-    return new System.DateTime(
-        deviceSystemDateTime.UTCDateTime.Date.Year,
-        deviceSystemDateTime.UTCDateTime.Date.Month,
-        deviceSystemDateTime.UTCDateTime.Date.Day,
-        deviceSystemDateTime.UTCDateTime.Time.Hour,
-        deviceSystemDateTime.UTCDateTime.Time.Minute,
-        deviceSystemDateTime.UTCDateTime.Time.Second,
-        0,
-        DateTimeKind.Utc
-    );
+    return ToDateTime(deviceSystemDateTime.UTCDateTime, DateTimeKind.Utc);
   }
 
   /// <summary>
@@ -224,18 +211,15 @@ public class Camera
 
   public async Task SyncTimeAsync() => await SetTimeAsync(System.DateTime.UtcNow);
 
+  /// <summary>Sets the camera's clock by hand, switching it to Manual mode.</summary>
+  /// <remarks>
+  /// Keeps the camera's daylight-saving flag and time zone. Earlier versions sent no zone and
+  /// DST off, which on some firmware reset the zone the camera was configured with.
+  /// </remarks>
   public async Task SetTimeAsync(System.DateTime utcTime)
   {
-    using var device = await GetDevice();
-    await device.SetSystemDateAndTimeAsync(
-      SetDateTimeType.Manual,
-      false,
-      null,
-      new DeviceServiceReference.DateTime
-      {
-        Date = new Date { Year = utcTime.Year, Month = utcTime.Month, Day = utcTime.Day },
-        Time = new Time { Hour = utcTime.Hour, Minute = utcTime.Minute, Second = utcTime.Second },
-      });
+    var current = await GetSystemDateAndTimeAsync();
+    await SetSystemDateAndTimeAsync("Manual", current.DaylightSavings, null, utcTime);
   }
 
   public string Url { get { return _url; } }
@@ -480,14 +464,24 @@ public class Camera
     _capabilitiesCacheAt = System.DateTime.UtcNow;
     return result;
   }
+  /// <summary>The device-management namespace, as GetServices reports it.</summary>
+  public const string WSDL_DEVICE = "http://www.onvif.org/ver10/device/wsdl";
+
+  /// <summary>
+  /// True when the service list came from the legacy GetCapabilities call because the camera
+  /// would not answer GetServices (ONVIF 1.x and early 2.0 firmware).
+  /// </summary>
+  /// <remarks>
+  /// Worth surfacing: a list built from GetCapabilities can only name the services that call
+  /// knew about, so Media2 never appears in it even on a camera that has it.
+  /// </remarks>
+  public bool UsedCapabilitiesFallback { get; private set; }
+
   private async Task<Dictionary<string, string>?> DoGetServices()
   {
     try
     {
-      using var client = await GetDevice();
-      var result = await client.GetServicesAsync(true);
-      _bindingProvider.RememberWorking();
-      return result.Service.ToDictionary(s => s.Namespace, s => s.XAddr);
+      return await ResolveServicesOnceAsync();
     }
     catch (Exception ex) when (IsAuthError(ex) && SwitchAuthScheme(ex))
     {
@@ -497,10 +491,7 @@ public class Camera
       _tokenExpiry = System.DateTime.UtcNow;
       try
       {
-        using var client = await GetDevice();
-        var result = await client.GetServicesAsync(true);
-        _bindingProvider.RememberWorking();
-        return result.Service.ToDictionary(s => s.Namespace, s => s.XAddr);
+        return await ResolveServicesOnceAsync();
       }
       catch (Exception retryEx)
       {
@@ -513,6 +504,96 @@ public class Camera
       _logger?.Error(ex.ToString());
       return null;
     }
+  }
+
+  private async Task<Dictionary<string, string>> ResolveServicesOnceAsync()
+  {
+    using var client = await GetDevice();
+    var map = await FetchServiceMapAsync(client);
+    _bindingProvider.RememberWorking();
+    return map;
+  }
+
+  /// <summary>
+  /// GetServices, or GetCapabilities when the camera does not implement it.
+  /// </summary>
+  /// <remarks>
+  /// An authentication failure is deliberately let through rather than answered with the
+  /// fallback: the caller switches between Basic and Digest on exactly that exception, and
+  /// GetCapabilities would only fail the same way under the same wrong scheme.
+  /// </remarks>
+  private async Task<Dictionary<string, string>> FetchServiceMapAsync(DeviceClient client)
+  {
+    try
+    {
+      var result = await client.GetServicesAsync(true);
+      if (result?.Service is { Length: > 0 } services)
+      {
+        UsedCapabilitiesFallback = false;
+        var map = new Dictionary<string, string>();
+        // TryAdd: firmware exists that lists one namespace twice, and ToDictionary would throw.
+        foreach (var s in services)
+          if (!string.IsNullOrEmpty(s.Namespace) && !string.IsNullOrEmpty(s.XAddr))
+            map.TryAdd(s.Namespace, s.XAddr);
+        return map;
+      }
+      _logger?.Warning($"GetServices returned no services for {_url}; falling back to GetCapabilities");
+    }
+    catch (Exception ex) when (!IsAuthError(ex))
+    {
+      _logger?.Warning($"GetServices failed for {_url} ({ex.Message}); falling back to GetCapabilities");
+    }
+
+    var caps = await client.GetCapabilitiesAsync([CapabilityCategory.All]);
+    UsedCapabilitiesFallback = true;
+    return MapCapabilities(caps?.Capabilities);
+  }
+
+  /// <summary>
+  /// Turns a GetCapabilities answer into the same namespace → XAddr map GetServices produces, so
+  /// every service lookup downstream works unchanged.
+  /// </summary>
+  /// <remarks>
+  /// Media maps to the ver10 namespace only: GetCapabilities predates Media2, and naming the
+  /// ver20 namespace for an XAddr that only speaks ver10 would make the media lookup pick the
+  /// wrong client. PTZ and Imaging never had a ver10 WSDL, so ver20 is the right key for them.
+  /// </remarks>
+  internal static Dictionary<string, string> MapCapabilities(DeviceServiceReference.Capabilities? c)
+  {
+    var map = new Dictionary<string, string>();
+    void Add(string ns, string? xaddr)
+    {
+      if (!string.IsNullOrWhiteSpace(xaddr)) map.TryAdd(ns, xaddr);
+    }
+
+    if (c == null) return map;
+    Add(WSDL_DEVICE, c.Device?.XAddr);
+    Add(MediaService.WSDL_V10, c.Media?.XAddr);
+    Add(PtzService2.WSDL_V20, c.PTZ?.XAddr);
+    Add(ImagingService2.WSDL_V20, c.Imaging?.XAddr);
+    Add(EventService1.WSDL_EVENTS, c.Events?.XAddr);
+    Add(AnalyticsService.WSDL_V20, c.Analytics?.XAddr);
+    Add(DeviceIOService2.WSDL_V10, c.Extension?.DeviceIO?.XAddr ?? ExtensionXAddr(c.Extension, "DeviceIO"));
+    Add(RecordingService.WSDL_V10, c.Extension?.Recording?.XAddr ?? ExtensionXAddr(c.Extension, "Recording"));
+    Add(SearchService.WSDL_V10, c.Extension?.Search?.XAddr ?? ExtensionXAddr(c.Extension, "Search"));
+    Add(ReplayService.WSDL_V10, c.Extension?.Replay?.XAddr ?? ExtensionXAddr(c.Extension, "Replay"));
+    return map;
+  }
+
+  /// <summary>
+  /// The XAddr of a capability that landed in the extension's catch-all instead of its own field.
+  /// </summary>
+  /// <remarks>
+  /// The schema puts <c>xs:any</c> first in CapabilitiesExtension, and firmware that leads with a
+  /// vendor element (seen: <c>extxsd:extCapabilities</c>) makes the serializer sweep every element
+  /// after it — DeviceIO, Recording, Search, Replay — into that catch-all. Without this the
+  /// fallback would report a Profile G camera as having no recording services at all.
+  /// </remarks>
+  private static string? ExtensionXAddr(CapabilitiesExtension? extension, string localName)
+  {
+    var element = extension?.Any?.FirstOrDefault(e =>
+      e.LocalName == localName && e.NamespaceURI == "http://www.onvif.org/ver10/schema");
+    return element?.ChildNodes.OfType<XmlElement>().FirstOrDefault(e => e.LocalName == "XAddr")?.InnerText.Trim();
   }
 
   /// <summary>

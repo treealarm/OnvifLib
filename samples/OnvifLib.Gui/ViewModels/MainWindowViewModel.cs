@@ -41,9 +41,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     Discovery = new DiscoveryViewModel(Runner, _logger) { Shell = this };
     Device = new DeviceViewModel(Runner, _logger, _dialogs);
-    Media = new MediaViewModel(Runner, _logger) { Video = Video };
-    Ptz = new PtzViewModel(Runner, _logger) { Video = Video };
-    Imaging = new ImagingViewModel(Runner, _logger);
+    Media = new MediaViewModel(Runner, _logger) { Video = Video, Dialogs = _dialogs };
+    Ptz = new PtzViewModel(Runner, _logger, _dialogs) { Video = Video };
+    Imaging = new ImagingViewModel(Runner, _logger) { Video = Video };
     Events = new EventsViewModel(Runner, _logger);
     Analytics = new AnalyticsViewModel(Runner, _logger, _dialogs);
     Replay = new VideoPlayerViewModel(Runner)

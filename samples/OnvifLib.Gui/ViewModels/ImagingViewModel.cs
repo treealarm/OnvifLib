@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OnvifLib.Gui.Infrastructure;
@@ -12,36 +13,72 @@ namespace OnvifLib.Gui.ViewModels;
 public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger logger)
   : TabViewModelBase("Imaging", runner, logger)
 {
+  /// <summary>The shared live view, shown on the focus page so focusing is not done blind.</summary>
+  public VideoPlayerViewModel? Video { get; set; }
+
   [ObservableProperty] private string _videoSourceToken = "";
   [ObservableProperty] private string _sourceLabel = "no stream selected";
 
-  [ObservableProperty] private double _brightness;
-  [ObservableProperty] private double _contrast;
-  [ObservableProperty] private double _saturation;
-  [ObservableProperty] private double _sharpness;
-
-  // Only the ticked ones are sent. The library treats null as "leave unchanged" and does its own
+  // Only the ticked rows are sent. The library treats null as "leave unchanged" and does its own
   // read-modify-write, so sending everything would overwrite settings that were never touched.
-  [ObservableProperty] private bool _changeBrightness;
-  [ObservableProperty] private bool _changeContrast;
-  [ObservableProperty] private bool _changeSaturation;
-  [ObservableProperty] private bool _changeSharpness;
+  // Moving a slider or picking a mode ticks its row.
+  public SliderSetting Brightness { get; } = new("Brightness");
+  public SliderSetting Contrast { get; } = new("Contrast");
+  public SliderSetting Saturation { get; } = new("Colour saturation");
+  public SliderSetting Sharpness { get; } = new("Sharpness");
+  public ObservableCollection<SliderSetting> Picture { get; } = [];
+  public ModeSetting IrCutFilter { get; } = new("Day/night (IR cut filter)");
 
-  [ObservableProperty] private double _brightnessMin;
-  [ObservableProperty] private double _brightnessMax = 100;
-  [ObservableProperty] private double _contrastMin;
-  [ObservableProperty] private double _contrastMax = 100;
-  [ObservableProperty] private double _saturationMin;
-  [ObservableProperty] private double _saturationMax = 100;
-  [ObservableProperty] private double _sharpnessMin;
-  [ObservableProperty] private double _sharpnessMax = 100;
+  public ModeSetting ExposureMode { get; } = new("Mode");
+  public ModeSetting ExposurePriority { get; } = new("Priority");
+  public SliderSetting ExposureTime { get; } = new("Exposure time");
+  public SliderSetting MinExposureTime { get; } = new("Min exposure time");
+  public SliderSetting MaxExposureTime { get; } = new("Max exposure time");
+  public SliderSetting Gain { get; } = new("Gain");
+  public SliderSetting MinGain { get; } = new("Min gain");
+  public SliderSetting MaxGain { get; } = new("Max gain");
+  public SliderSetting Iris { get; } = new("Iris");
+  public SliderSetting MinIris { get; } = new("Min iris");
+  public SliderSetting MaxIris { get; } = new("Max iris");
+  public ObservableCollection<SliderSetting> Exposure { get; } = [];
 
-  [ObservableProperty] private bool _hasBrightness;
-  [ObservableProperty] private bool _hasContrast;
-  [ObservableProperty] private bool _hasSaturation;
-  [ObservableProperty] private bool _hasSharpness;
+  public ModeSetting WhiteBalanceMode { get; } = new("White balance");
+  public SliderSetting CrGain { get; } = new("Cr gain");
+  public SliderSetting CbGain { get; } = new("Cb gain");
+  public ObservableCollection<SliderSetting> WhiteBalance { get; } = [];
+
+  public ModeSetting WdrMode { get; } = new("Wide dynamic range");
+  public SliderSetting WdrLevel { get; } = new("WDR level");
+  public ModeSetting BlcMode { get; } = new("Backlight compensation");
+  public SliderSetting BlcLevel { get; } = new("BLC level");
+
+  public ModeSetting FocusMode { get; } = new("Auto focus");
+  public SliderSetting FocusDefaultSpeed { get; } = new("Default speed");
+  public SliderSetting FocusNearLimit { get; } = new("Near limit");
+  public SliderSetting FocusFarLimit { get; } = new("Far limit");
+  public ObservableCollection<SliderSetting> FocusConfiguration { get; } = [];
 
   [ObservableProperty] private string _statusText = "load the options and the settings to begin";
+
+  private IEnumerable<SliderSetting> AllSliders =>
+    Picture.Concat(Exposure).Concat(WhiteBalance).Concat(FocusConfiguration).Append(WdrLevel).Append(BlcLevel);
+
+  private IEnumerable<ModeSetting> AllModes =>
+    [IrCutFilter, ExposureMode, ExposurePriority, WhiteBalanceMode, WdrMode, BlcMode, FocusMode];
+
+  // The collections are filled here rather than in initialisers because a primary-constructor
+  // class cannot order field initialisers that refer to each other.
+  private bool _built;
+  private void Build()
+  {
+    if (_built) return;
+    _built = true;
+    foreach (var s in new[] { Brightness, Contrast, Saturation, Sharpness }) Picture.Add(s);
+    foreach (var s in new[] { ExposureTime, Gain, Iris, MinExposureTime, MaxExposureTime, MinGain, MaxGain, MinIris, MaxIris }) Exposure.Add(s);
+    WhiteBalance.Add(CrGain);
+    WhiteBalance.Add(CbGain);
+    foreach (var s in new[] { FocusDefaultSpeed, FocusNearLimit, FocusFarLimit }) FocusConfiguration.Add(s);
+  }
 
   protected override string? DescribeUnavailability(CameraSession session) => session.Imaging is null
     ? session.Advertises(ImagingService2.GetSupportedWsdls())
@@ -51,6 +88,7 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
 
   protected override void OnConnected(CameraSession session)
   {
+    Build();
     // Do not rely on Media.ProfileSelected alone: BindSelection calls SetSession on Imaging
     // *after* Media has already pushed the new profile, and OnCleared would wipe that token.
     if (string.IsNullOrEmpty(VideoSourceToken))
@@ -61,13 +99,16 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
   {
     VideoSourceToken = "";
     SourceLabel = "no stream selected";
-    HasBrightness = HasContrast = HasSaturation = HasSharpness = false;
+    foreach (var s in AllSliders) s.Reset();
+    foreach (var m in AllModes) m.Reset();
+    ClearFocusControl();
     StatusText = "open this tab to read the current picture settings";
   }
 
   /// <summary>Follows the Media tab's stream selection. The ONVIF token stays off the UI.</summary>
   public void SetProfile(OnvifProfileInfo? profile)
   {
+    Build();
     VideoSourceToken = profile?.VideoSourceToken ?? "";
     SourceLabel = profile is { } p
       ? string.IsNullOrWhiteSpace(p.Name) ? $"{p.Width}×{p.Height} {p.Encoding}" : p.Name
@@ -77,10 +118,12 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
   public override async Task ActivateAsync()
   {
     if (!IsAvailable || Session?.Imaging is null) return;
+    Build();
     if (string.IsNullOrEmpty(VideoSourceToken))
       SetProfile(Session.Media?.GetProfiles().FirstOrDefault());
     await LoadOptionsAsync();
     await LoadSettingsAsync();
+    await LoadFocusControlAsync();
   }
 
   [RelayCommand]
@@ -93,25 +136,43 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
       return;
     }
 
-    var (ok, options) = await Runner.RunAsync("GetImagingOptions", () => imaging.GetOptionsAsync(source));
+    var (ok, o) = await Runner.RunAsync("GetImagingOptions", () => imaging.GetOptionsAsync(source));
     if (!ok) return;
-    if (options is null) { StatusText = "the camera reported no imaging options for this video source"; return; }
+    if (o is null) { StatusText = "the camera reported no imaging options for this video source"; return; }
 
-    // A setting the camera does not report a range for gets its slider disabled rather than a
-    // made-up 0..100, which would let the user send a value the camera will reject.
-    Apply(options.Brightness, v => BrightnessMin = v, v => BrightnessMax = v, v => HasBrightness = v);
-    Apply(options.Contrast, v => ContrastMin = v, v => ContrastMax = v, v => HasContrast = v);
-    Apply(options.ColorSaturation, v => SaturationMin = v, v => SaturationMax = v, v => HasSaturation = v);
-    Apply(options.Sharpness, v => SharpnessMin = v, v => SharpnessMax = v, v => HasSharpness = v);
+    Brightness.SetRange(o.Brightness);
+    Contrast.SetRange(o.Contrast);
+    Saturation.SetRange(o.ColorSaturation);
+    Sharpness.SetRange(o.Sharpness);
+    IrCutFilter.SetModes(o.IrCutFilterModes);
+
+    ExposureMode.SetModes(o.Exposure?.Modes);
+    ExposurePriority.SetModes(o.Exposure?.Priorities);
+    ExposureTime.SetRange(o.Exposure?.ExposureTime);
+    MinExposureTime.SetRange(o.Exposure?.MinExposureTime);
+    MaxExposureTime.SetRange(o.Exposure?.MaxExposureTime);
+    Gain.SetRange(o.Exposure?.Gain);
+    MinGain.SetRange(o.Exposure?.MinGain);
+    MaxGain.SetRange(o.Exposure?.MaxGain);
+    Iris.SetRange(o.Exposure?.Iris);
+    MinIris.SetRange(o.Exposure?.MinIris);
+    MaxIris.SetRange(o.Exposure?.MaxIris);
+
+    WhiteBalanceMode.SetModes(o.WhiteBalance?.Modes);
+    CrGain.SetRange(o.WhiteBalance?.YrGain);
+    CbGain.SetRange(o.WhiteBalance?.YbGain);
+
+    WdrMode.SetModes(o.WideDynamicRange?.Modes);
+    WdrLevel.SetRange(o.WideDynamicRange?.Level);
+    BlcMode.SetModes(o.BacklightCompensation?.Modes);
+    BlcLevel.SetRange(o.BacklightCompensation?.Level);
+
+    FocusMode.SetModes(o.Focus?.AutoFocusModes);
+    FocusDefaultSpeed.SetRange(o.Focus?.DefaultSpeed);
+    FocusNearLimit.SetRange(o.Focus?.NearLimit);
+    FocusFarLimit.SetRange(o.Focus?.FarLimit);
+
     StatusText = "ranges loaded";
-
-    static void Apply(OnvifFloatRange? range, Action<double> min, Action<double> max, Action<bool> has)
-    {
-      has(range is not null);
-      if (range is null) return;
-      min(range.Min);
-      max(range.Max);
-    }
   }
 
   [RelayCommand]
@@ -125,17 +186,70 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
       return;
     }
 
-    var (ok, settings) = await Runner.RunAsync("GetImagingSettings", () => imaging.GetImagingSettingsAsync(source));
+    var (ok, s) = await Runner.RunAsync("GetImagingSettings", () => imaging.GetImagingSettingsAsync(source));
     if (!ok) return;
-    if (settings is null) { StatusText = "the camera reported no imaging settings for this video source"; return; }
+    if (s is null) { StatusText = "the camera reported no imaging settings for this video source"; return; }
 
-    if (settings.Brightness is { } b) Brightness = b;
-    if (settings.Contrast is { } c) Contrast = c;
-    if (settings.ColorSaturation is { } s) Saturation = s;
-    if (settings.Sharpness is { } sh) Sharpness = sh;
+    Brightness.Load(s.Brightness);
+    Contrast.Load(s.Contrast);
+    Saturation.Load(s.ColorSaturation);
+    Sharpness.Load(s.Sharpness);
+    IrCutFilter.Load(s.IrCutFilter);
 
-    ChangeBrightness = ChangeContrast = ChangeSaturation = ChangeSharpness = false;
+    ExposureMode.Load(s.Exposure?.Mode);
+    ExposurePriority.Load(s.Exposure?.Priority);
+    ExposureTime.Load(s.Exposure?.ExposureTime);
+    MinExposureTime.Load(s.Exposure?.MinExposureTime);
+    MaxExposureTime.Load(s.Exposure?.MaxExposureTime);
+    Gain.Load(s.Exposure?.Gain);
+    MinGain.Load(s.Exposure?.MinGain);
+    MaxGain.Load(s.Exposure?.MaxGain);
+    Iris.Load(s.Exposure?.Iris);
+    MinIris.Load(s.Exposure?.MinIris);
+    MaxIris.Load(s.Exposure?.MaxIris);
+
+    WhiteBalanceMode.Load(s.WhiteBalance?.Mode);
+    CrGain.Load(s.WhiteBalance?.CrGain);
+    CbGain.Load(s.WhiteBalance?.CbGain);
+
+    WdrMode.Load(s.WideDynamicRange?.Mode);
+    WdrLevel.Load(s.WideDynamicRange?.Level);
+    BlcMode.Load(s.BacklightCompensation?.Mode);
+    BlcLevel.Load(s.BacklightCompensation?.Level);
+
+    FocusMode.Load(s.Focus?.AutoFocusMode);
+    FocusDefaultSpeed.Load(s.Focus?.DefaultSpeed);
+    FocusNearLimit.Load(s.Focus?.NearLimit);
+    FocusFarLimit.Load(s.Focus?.FarLimit);
+
     StatusText = "settings read from the camera";
+  }
+
+  /// <summary>Builds the update from the ticked rows only. Null groups are left as they are.</summary>
+  public OnvifImagingSettings BuildRequest()
+  {
+    OnvifExposure? exposure = new(
+      ExposureMode.Requested, ExposurePriority.Requested,
+      MinExposureTime.Requested, MaxExposureTime.Requested,
+      MinGain.Requested, MaxGain.Requested,
+      MinIris.Requested, MaxIris.Requested,
+      ExposureTime.Requested, Gain.Requested, Iris.Requested);
+    OnvifWhiteBalance? whiteBalance = new(WhiteBalanceMode.Requested, CrGain.Requested, CbGain.Requested);
+    OnvifFocusSettings? focus = new(FocusMode.Requested, FocusDefaultSpeed.Requested, FocusNearLimit.Requested, FocusFarLimit.Requested);
+    OnvifModeLevel? wdr = new(WdrMode.Requested, WdrLevel.Requested);
+    OnvifModeLevel? blc = new(BlcMode.Requested, BlcLevel.Requested);
+
+    return new OnvifImagingSettings(
+      Brightness.Requested,
+      Contrast.Requested,
+      Saturation.Requested,
+      Sharpness.Requested,
+      IrCutFilter: IrCutFilter.Requested,
+      Exposure: exposure == new OnvifExposure() ? null : exposure,
+      WhiteBalance: whiteBalance == new OnvifWhiteBalance() ? null : whiteBalance,
+      Focus: focus == new OnvifFocusSettings() ? null : focus,
+      WideDynamicRange: wdr == new OnvifModeLevel() ? null : wdr,
+      BacklightCompensation: blc == new OnvifModeLevel() ? null : blc);
   }
 
   [RelayCommand]
@@ -144,17 +258,12 @@ public sealed partial class ImagingViewModel(OperationRunner runner, UiLogger lo
     if (Session?.Imaging is not { } imaging) return;
     if (VideoSourceToken is not { Length: > 0 } source) return;
 
-    if (!ChangeBrightness && !ChangeContrast && !ChangeSaturation && !ChangeSharpness)
+    var settings = BuildRequest();
+    if (settings == new OnvifImagingSettings(null, null, null, null))
     {
       Runner.Report("Nothing is ticked to change", isError: true);
       return;
     }
-
-    var settings = new OnvifImagingSettings(
-      ChangeBrightness ? (float)Brightness : null,
-      ChangeContrast ? (float)Contrast : null,
-      ChangeSaturation ? (float)Saturation : null,
-      ChangeSharpness ? (float)Sharpness : null);
 
     if (await Runner.RunAsync("SetImagingSettings", () => imaging.SetImagingSettingsAsync(source, settings)))
       await LoadSettingsAsync();

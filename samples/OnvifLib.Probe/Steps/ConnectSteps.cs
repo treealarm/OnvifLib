@@ -28,6 +28,12 @@ public static class ConnectSteps
     if (services is null) return false;
     ctx.Runner.Report.Connected = true;
 
+    // A camera that cannot answer GetServices is an ONVIF 1.x/2.0 device. Saying so up front
+    // explains why Media2 can be missing from a list on a camera that might have it.
+    r.Value("service list from", ctx.Camera.UsedCapabilitiesFallback
+      ? "GetCapabilities (GetServices unsupported — ONVIF 1.x/2.0 firmware)"
+      : "GetServices");
+
     await r.StepAsync("IsAlive", ctx.Camera.IsAlive, alive => r.Value("alive", alive));
 
     // One PTZ GetConfigurations round trip hides in here; the result is cached in Camera for 5 min.

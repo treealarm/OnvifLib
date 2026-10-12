@@ -71,7 +71,7 @@ HEVC main stream — when you need it.
 connects it; **Connect** does the same for the already-selected row. Device list, last address,
 video prefs, and **Theme** (Light / Dark) go to `settings.json`. A password is stored only if you
 tick **Remember** (off by default), and then encrypted — DPAPI on Windows, a key in the desktop
-keyring via `secret-tool` on Linux; without a keyring the option is disabled. See
+keyring (Secret Service over D-Bus) on Linux; without a keyring the option is disabled. See
 [PRIVACY.md](../../PRIVACY.md).
 
 A tab the camera cannot support still opens and says so, rather than disappearing.
@@ -87,13 +87,13 @@ dotnet run --project samples/OnvifLib.Gui -- --selftest
 |---|---|
 | **Device list** | Cameras you have discovered or added. JPEG thumbnails refresh for connected devices. Click a row to connect. |
 | **Live** | In-window RTSP playback of the selected camera (ffmpeg → BGRA). The same player is embedded on Media and PTZ. |
-| **Device** | Identity, capabilities, clock, services; storage and destructive ops on a second sub-tab. |
-| **Media** | Sub-tabs: Streams, Snapshot, Encoders, Profile M — each fits without page scrolling. |
-| **PTZ** | A press-and-hold direction pad, relative and absolute movement, presets, and the live picture so you are not moving the head blind. |
-| **Imaging** | Brightness, contrast, saturation and sharpness, with the ranges the camera reports. |
-| **Events** | The pull-point subscription, the raw notifications it produces, and a panel for `Camera.ParseEvent`. |
+| **Device** | Sub-tabs: Identity (capabilities, clock, services), Storage & admin, Date & time (mode, time zone, DST, setting the clock), Users, Network (interfaces, hostname, DNS, NTP, gateway, protocols) and Scopes. Every change asks first. |
+| **Media** | Sub-tabs: Streams, Snapshot, Encoders, Profile M, and OSD & sources (video source configurations and on-screen display text). |
+| **PTZ** | A press-and-hold direction pad, relative and absolute movement, presets, home position and auxiliary commands, and the live picture so you are not moving the head blind. |
+| **Imaging** | Sub-tabs: Picture (with day/night), Exposure, White balance · WDR · BLC, and Focus (configuration, press-and-hold and stepped lens moves, beside the live picture). |
+| **Events** | The pull-point subscription, the camera's topic list, topic filters, the synchronization point, the raw notifications, and a panel for `Camera.ParseEvent`. |
 | **Analytics** | Modules, rules, and parameters on separate sub-tabs. |
-| **Profile G** | Sub-tabs: On camera (recordings/jobs) and Search & archive (search + archive player). |
+| **Profile G** | Sub-tabs: On camera (recordings, jobs, job editor and state, creating recordings and tracks), Search & archive (search + archive player), and Events (events stored with the recordings). |
 | **Device I/O** | Relay outputs and digital inputs. |
 | **Discovery** | WS-Discovery again, plus a brute-force IP sweep for networks where multicast does not reach. Double-click a result to add it to the list. |
 | **Log** | Everything the library logged, optionally including the full SOAP exchange. **The first place to look when anything above fails.** |
