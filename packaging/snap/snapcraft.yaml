@@ -1,0 +1,102 @@
+# Snap of OnvifLib.Gui for the Snap Store: https://snapcraft.io/onviflib-gui
+#
+# Nothing is compiled here. The snap repackages the self-contained linux-x64 publish output that
+# also ships as OnvifLib.Gui-linux-x64.zip on GitHub Releases, so both carry the same binaries
+# and the same bundled ffmpeg. Run ./stage.sh <zip-or-publish-dir> <version> first: it fills
+# payload/ (gitignored), the only input this file reads. The release workflow does that in its
+# "snap" job (.github/workflows/release-gui.yml); README.md has the local recipe.
+name: onviflib-gui
+title: OnvifLib.Gui
+summary: ONVIF camera manager with live H.264 / HEVC video
+description: |
+  OnvifLib.Gui is a cross-platform alternative to ONVIF Device Manager, built with Avalonia.
+
+  - Discover cameras on the local network (WS-Discovery) or add them by address
+  - Live H.264 / HEVC video through the bundled ffmpeg, several cameras in tabs
+  - PTZ and presets, imaging, OSD, events, analytics, Profile G archive search and replay, Device I/O
+  - Administration: users, network, date and time, maintenance
+
+  Remembered camera passwords are encrypted with a key kept in the desktop keyring. That needs
+  the password-manager-service interface:
+
+      sudo snap connect onviflib-gui:password-manager-service
+
+  Until it is connected the "Remember password" option stays off and nothing is stored.
+  Saving snapshots to a USB drive needs `sudo snap connect onviflib-gui:removable-media`.
+
+  The app is MIT. The bundled ffmpeg is an LGPL build from BtbN/FFmpeg-Builds.
+  Source and issues: https://github.com/treealarm/OnvifLib
+
+# The version is the gui-X.Y.Z tag, written to payload/version by stage.sh and adopted below.
+adopt-info: app
+base: core24
+confinement: strict
+grade: stable
+# The app is MIT; the bundled ffmpeg binary is LGPL.
+license: MIT AND LGPL-2.1-or-later
+website: https://github.com/treealarm/OnvifLib
+source-code: https://github.com/treealarm/OnvifLib
+issues: https://github.com/treealarm/OnvifLib/issues
+contact: https://github.com/treealarm/OnvifLib/issues
+# Copy of the repository's icon.png, placed by stage.sh. Store listing and the .desktop entry
+# (snapcraft rewrites its Icon= to this file).
+icon: payload/icon.png
+# Faster to mount and read than the default xz; the payload is 250 MB of assemblies.
+compression: lzo
+
+platforms:
+  amd64:
+
+lint:
+  ignore:
+    # LTTng trace provider of the .NET runtime: loaded only when liblttng-ust is present, and
+    # the zip ships it too. Not worth a stage-package.
+    - library:
+        - app/libcoreclrtraceptprovider.so
+
+apps:
+  onviflib-gui:
+    command: app/OnvifLib.Gui
+    desktop: usr/share/applications/onviflib-gui.desktop
+    # X11/Wayland/GL libraries, ICU, fonts and themes from the gnome-46-2404 and mesa-2404
+    # content snaps, plus the desktop-launch environment: it points XDG_CONFIG_HOME and
+    # XDG_DATA_HOME under $SNAP_USER_DATA, so .NET puts settings.json in
+    # ~/snap/onviflib-gui/current/.config/OnvifLib.Gui/ and the ffmpeg cache in
+    # ~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/.
+    extensions: [gnome]
+    plugs:
+      # ONVIF SOAP over HTTP(S), RTSP video, JPEG snapshots, the optional ffmpeg download.
+      - network
+      # WS-Discovery binds a UDP socket to receive the replies to the multicast probe on 3702.
+      - network-bind
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - opengl
+      # Save… for snapshots and SOAP logs anywhere under the home directory.
+      - home
+      # Same, on USB drives. Not auto-connected: sudo snap connect onviflib-gui:removable-media
+      - removable-media
+      # "Remember password": the AES key lives in the Secret Service keyring over the session
+      # D-Bus. Manual connect until the store approves auto-connect; without it the option is
+      # disabled, nothing is written.
+      - password-manager-service
+
+parts:
+  app:
+    # The publish tree as-is: OnvifLib.Gui host, assemblies, native runtime, ffmpeg/ffmpeg.
+    # FfmpegLocator looks for ffmpeg/ffmpeg next to the executable, so it is found first.
+    plugin: dump
+    source: payload/app
+    organize:
+      "*": app/
+    override-build: |
+      craftctl default
+      craftctl set version="$(cat "$CRAFT_PROJECT_DIR/payload/version")"
+
+  desktop:
+    plugin: dump
+    source: desktop
+    organize:
+      onviflib-gui.desktop: usr/share/applications/onviflib-gui.desktop

@@ -41,10 +41,15 @@ decodes video, and only here.
 | | |
 |---|---|
 | Windows | Prefer **`OnvifLib.Gui-win-x64.msi`** (WiX → Program Files, Start Menu; avoids Mark-of-the-Web on extracted files). Portable: unzip `OnvifLib.Gui-win-x64.zip`. Build notes: [OnvifLib.Gui.Setup](../OnvifLib.Gui.Setup/README.md). winget manifests: [`packaging/winget`](../../packaging/winget). |
-| Linux | Unzip `OnvifLib.Gui-linux-x64.zip` → run `./OnvifLib.Gui` (needs a desktop session). |
+| Linux | **`sudo snap install onviflib-gui`** ([Snap Store](https://snapcraft.io/onviflib-gui): strict confinement, auto-updates, menu entry). Portable: unzip `OnvifLib.Gui-linux-x64.zip` → run `./OnvifLib.Gui` (needs a desktop session). Recipe: [`packaging/snap`](../../packaging/snap). |
 
 No separate .NET or ffmpeg install for in-window playback. ffmpeg is also resolved from `PATH`,
 an app-data cache, or a path you type if you prefer your own build.
+
+In the snap, **Remember password** needs the keyring interface, which is not yet auto-connected:
+`sudo snap connect onviflib-gui:password-manager-service`. Until then the option stays disabled
+and no password is written. Saving snapshots to a USB drive likewise needs
+`sudo snap connect onviflib-gui:removable-media`.
 
 ```bash
 # From source
@@ -57,7 +62,7 @@ dotnet run --project samples/OnvifLib.Gui
 |---|---|---|
 | Platforms | Windows | **Windows and Linux** |
 | Live codecs | Limited (HEVC often missing) | **H.264 / HEVC via ffmpeg** |
-| Install | Classic installer ecosystem | **WiX MSI** + portable zip ([winget](../../packaging/winget)) |
+| Install | Classic installer ecosystem | **WiX MSI** ([winget](../../packaging/winget)), **Snap** ([Snap Store](https://snapcraft.io/onviflib-gui)), portable zip |
 | Profile G / M | Weak or absent on many builds | Search, archive replay, metadata/analytics configs |
 | Multi-camera | One context at a time in practice | Several connected; tabs follow the **selected** row |
 | Stack | Aging .NET / DirectShow-era player | .NET 10 + Avalonia + current ffmpeg |
@@ -71,7 +76,8 @@ HEVC main stream — when you need it.
 connects it; **Connect** does the same for the already-selected row. Device list, last address,
 video prefs, and **Theme** (Light / Dark) go to `settings.json`. A password is stored only if you
 tick **Remember** (off by default), and then encrypted — DPAPI on Windows, a key in the desktop
-keyring (Secret Service over D-Bus) on Linux; without a keyring the option is disabled. See
+keyring (Secret Service over D-Bus) on Linux; without a keyring the option is disabled (in the
+snap: until `snap connect onviflib-gui:password-manager-service`). See
 [PRIVACY.md](../../PRIVACY.md).
 
 A tab the camera cannot support still opens and says so, rather than disappearing.
@@ -110,7 +116,8 @@ ffmpeg is located in this order:
 
 1. **Next to the app** — release zips ship `ffmpeg/ffmpeg` (or `ffmpeg.exe`).
 2. **`PATH`** — if `ffmpeg` is already installed, nothing is downloaded.
-3. **App data cache** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux, `%LocalAppData%\OnvifLib.Gui\ffmpeg\` on Windows.
+3. **App data cache** — `~/.local/share/OnvifLib.Gui/ffmpeg/` on Linux (snap:
+   `~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/`), `%LocalAppData%\OnvifLib.Gui\ffmpeg\` on Windows.
 4. **A path you type** in the player bar (kept in `settings.json`).
 5. **Download** — the **Download ffmpeg** button, and the first **Play** if nothing else was found.
    That fetches a pinned **LGPL** BtbN build for `win-x64` or `linux-x64`, checks SHA256, and
@@ -129,7 +136,8 @@ An **external player** (VLC / ffplay / mpv) is still offered on the Media tab as
 default differs by platform for an empirical reason: **the VLC packaged for current Debian and
 Ubuntu no longer ships the live555 demuxer**, so it cannot open a plain RTSP stream. `ffplay`
 carries its own RTSP support and leads on Linux; the official Windows VLC build still has live555
-and leads there.
+and leads there. The strictly confined snap cannot start players installed on the host, so there
+only in-window playback (bundled ffmpeg) is available.
 
 **The password is passed to ffmpeg and to any external player on the command line**, so it is
 visible in `ps` or Task Manager. Everything the app *displays* or *logs* has the password blanked;

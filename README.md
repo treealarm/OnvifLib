@@ -33,11 +33,11 @@ Classic [ONVIF Device Manager](https://sourceforge.net/projects/onvifdm/) is Win
 |---|---|---|
 | Platforms | Windows | **Windows + Linux** |
 | Live video | Limited (HEVC often missing) | **H.264 / HEVC** via ffmpeg |
-| Install | Aging installer | **WiX MSI** + portable zip |
+| Install | Aging installer | **WiX MSI**, **Snap**, portable zip |
 | Profiles | Weak G/M on many builds | Profile G archive + Profile M / analytics |
 | Stack | Legacy player era | .NET 10 + Avalonia |
 
-Windows: prefer the MSI from [Releases](https://github.com/treealarm/OnvifLib/releases) (Program Files, no Mark-of-the-Web). Linux: zip. After winget merges: `winget install treealarm.OnvifLib.Gui`.
+Windows: prefer the MSI from [Releases](https://github.com/treealarm/OnvifLib/releases) (Program Files, no Mark-of-the-Web). Linux: `sudo snap install onviflib-gui` ([Snap Store](https://snapcraft.io/onviflib-gui)); the zip on Releases is the portable variant. "Remember password" in the snap needs `sudo snap connect onviflib-gui:password-manager-service` until auto-connect is approved. After winget merges: `winget install treealarm.OnvifLib.Gui`.
 
 ---
 

@@ -166,6 +166,61 @@ jobs:
           path: artifacts/OnvifLib.Gui-win-x64.msi
           if-no-files-found: error
 
+  snap:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download linux-x64 zip
+        uses: actions/download-artifact@v7
+        with:
+          name: OnvifLib.Gui-linux-x64
+          path: dist
+
+      - name: Snap version
+        id: ver
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="${GITHUB_REF_NAME}"; fi
+          VER="${TAG#gui-}"
+          if echo "$VER" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag '$TAG' is not gui-major.minor[.build]; building a test snap that is not published"
+            VER="0.0.0+git${GITHUB_SHA::7}"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      # Same payload as the zip: the snap is a repackaging, not a second build.
+      - name: Stage publish output
+        run: packaging/snap/stage.sh dist/OnvifLib.Gui-linux-x64.zip "${{ steps.ver.outputs.version }}"
+
+      - name: Build snap
+        id: snap
+        uses: snapcore/action-build@v1
+        with:
+          path: packaging/snap
+
+      - name: Upload snap
+        uses: actions/upload-artifact@v6
+        with:
+          name: OnvifLib.Gui-linux-x64-snap
+          path: ${{ steps.snap.outputs.snap }}
+          if-no-files-found: error
+
+      # Needs the SNAPCRAFT_STORE_CREDENTIALS secret (packaging/snap/README.md, "Store setup").
+      - name: Publish to the Snap Store (stable)
+        if: steps.ver.outputs.publish == 'true'
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.snap.outputs.snap }}
+          release: stable
+
   release:
     needs: [build, msi]
     runs-on: ubuntu-latest
@@ -213,7 +268,7 @@ jobs:
             ### Downloads
             - **OnvifLib.Gui-win-x64.msi** — Windows x64 (**WiX** installer → Program Files, Start Menu). Prefer this over the zip so Windows does not mark binaries as downloaded from the Internet.
             - **OnvifLib.Gui-win-x64.zip** — Windows x64 portable (same payload; no separate installer)
-            - **OnvifLib.Gui-linux-x64.zip** — Linux x64, self-contained .NET 10 + LGPL `ffmpeg`
+            - **OnvifLib.Gui-linux-x64.zip** — Linux x64 portable, self-contained .NET 10 + LGPL `ffmpeg`. Preferred on Linux: `sudo snap install onviflib-gui` (same payload, from the Snap Store)
 
             Bundled ffmpeg (BtbN n8.1.x) lives under `ffmpeg/` next to the app.
 
@@ -221,6 +276,11 @@ jobs:
             Install `OnvifLib.Gui-win-x64.msi`, or unzip the portable zip and run `OnvifLib.Gui.exe`.
 
             ### Run (Linux)
+            ```bash
+            sudo snap install onviflib-gui
+            sudo snap connect onviflib-gui:password-manager-service   # only for "Remember password"
+            ```
+            or the portable zip:
             ```bash
             unzip OnvifLib.Gui-linux-x64.zip
             cd OnvifLib.Gui-linux-x64
@@ -232,4 +292,4 @@ jobs:
             ### Notes
             - Linux needs a desktop session (X11/Wayland).
             - App is MIT; bundled `ffmpeg` is LGPL — see `ffmpeg/README.txt`.
-            - winget manifests: `packaging/winget` in the repo.
+            - winget manifests: `packaging/winget`; snap recipe: `packaging/snap` in the repo.

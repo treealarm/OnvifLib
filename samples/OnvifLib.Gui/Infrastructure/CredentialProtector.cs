@@ -38,7 +38,10 @@ public static class CredentialProtector
   public static bool IsAvailable => OperatingSystem.IsWindows() || KeyringAvailable.Value;
 
   public static string UnavailableReason => OperatingSystem.IsLinux()
-    ? "Remembering passwords needs a desktop keyring (GNOME Keyring, KWallet) on the session bus."
+    ? Environment.GetEnvironmentVariable("SNAP_NAME") is { Length: > 0 } snap
+      // Strict confinement: the keyring is on the bus, but the app may not talk to it yet.
+      ? $"Remembering passwords needs the keyring interface: sudo snap connect {snap}:password-manager-service"
+      : "Remembering passwords needs a desktop keyring (GNOME Keyring, KWallet) on the session bus."
     : "Remembering passwords is not supported on this platform.";
 
   /// <summary>Null when the password is empty or cannot be protected; never returns clear text.</summary>

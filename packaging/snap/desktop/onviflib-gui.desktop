@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=OnvifLib.Gui
+GenericName=IP camera manager
+Comment=Discover ONVIF cameras, watch live H.264/HEVC video, drive PTZ and settings
+Exec=onviflib-gui
+Icon=onviflib-gui
+Terminal=false
+Categories=Network;AudioVideo;Video;
+Keywords=onvif;camera;ip camera;rtsp;ptz;cctv;nvr;
+StartupNotify=true
+StartupWMClass=OnvifLib.Gui

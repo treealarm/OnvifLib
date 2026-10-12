@@ -31,16 +31,19 @@ internal static class SecretServiceKeyring
   private static readonly TimeSpan PromptTimeout = TimeSpan.FromMinutes(2);
   private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(3);
 
-  /// <summary>True when there is a session bus and something on it provides the Secret Service.</summary>
+  /// <summary>True when a Secret Service answers on the session bus and has a default collection.</summary>
+  /// <remarks>
+  /// Asks the service itself instead of listing bus names. Under snap confinement ListNames is
+  /// denied whatever interfaces are connected, whereas a call to the service goes through exactly
+  /// when password-manager-service is connected; so this probe, not the name list, tells whether
+  /// <see cref="Store"/> can work. The bus starts the keyring on first call if it is not running.
+  /// </remarks>
   public static bool IsAvailable()
   {
     if (!OperatingSystem.IsLinux() || string.IsNullOrEmpty(Address.Session)) return false;
     try
     {
-      // The keyring is normally running already; failing that, the bus starts it on first call.
-      return Run(async connection =>
-        (await connection.ListServicesAsync()).Contains(Bus)
-        || (await connection.ListActivatableServicesAsync()).Contains(Bus), ProbeTimeout);
+      return Run(async connection => await ReadAliasAsync(connection, "default") != NoObject, ProbeTimeout);
     }
     catch (Exception)
     {

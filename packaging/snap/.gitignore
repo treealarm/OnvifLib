@@ -1,0 +1,7 @@
+# Filled by stage.sh from the publish output.
+payload/
+# snapcraft output and, in destructive mode, its working directories.
+*.snap
+parts/
+stage/
+prime/

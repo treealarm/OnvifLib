@@ -1,10 +1,10 @@
 # Privacy policy — OnvifLib.Gui
 
 Applies to **OnvifLib.Gui**, the desktop ONVIF camera manager published from this repository
-(GitHub Releases, the WiX MSI, and the winget package `treealarm.OnvifLib.Gui`), and to the
-**OnvifLib** .NET library it is built on.
+(GitHub Releases, the WiX MSI, the winget package `treealarm.OnvifLib.Gui` and the snap
+`onviflib-gui`), and to the **OnvifLib** .NET library it is built on.
 
-Last updated: 2026-09-27.
+Last updated: 2026-10-12.
 
 ## Summary
 
@@ -45,7 +45,9 @@ is gone when the app closes.
   your Windows account on the same computer can decrypt it.
 - **Linux:** encrypted with AES-256-GCM. The key is random, is created on first use and is stored in
   your desktop keyring (Secret Service — GNOME Keyring, KWallet and similar), which the app reaches
-  over the session D-Bus. Nothing extra needs to be installed.
+  over the session D-Bus. Nothing extra needs to be installed. In the snap, the keyring is
+  reachable only after `sudo snap connect onviflib-gui:password-manager-service`; until then the
+  option is disabled.
 - **If no such secure store is available** (for example in a session without a keyring daemon), the
   "Remember password" option is disabled and passwords are never saved.
 
@@ -68,8 +70,8 @@ Please be aware of the following limits, which come from how cameras work rather
 
 | What | Location |
 |---|---|
-| Settings and device list | Windows: `%APPDATA%\OnvifLib.Gui\settings.json` · Linux: `~/.config/OnvifLib.Gui/settings.json` |
-| Downloaded ffmpeg (only if you use **Download ffmpeg**) | Windows: `%LOCALAPPDATA%\OnvifLib.Gui\ffmpeg\` · Linux: `~/.local/share/OnvifLib.Gui/ffmpeg/` |
+| Settings and device list | Windows: `%APPDATA%\OnvifLib.Gui\settings.json` · Linux: `~/.config/OnvifLib.Gui/settings.json` · Linux snap: `~/snap/onviflib-gui/current/.config/OnvifLib.Gui/settings.json` |
+| Downloaded ffmpeg (only if you use **Download ffmpeg**) | Windows: `%LOCALAPPDATA%\OnvifLib.Gui\ffmpeg\` · Linux: `~/.local/share/OnvifLib.Gui/ffmpeg/` · Linux snap: `~/snap/onviflib-gui/current/.local/share/OnvifLib.Gui/ffmpeg/` |
 | Linux keyring entry | Secret Service item labelled "OnvifLib.Gui settings encryption key" |
 | Saved snapshots and logs | Only where you chose to save them |
 
@@ -84,6 +86,8 @@ To delete your data:
 
 Uninstalling the app (MSI, winget, or deleting the portable folder) removes the program but, like
 most Windows and Linux desktop apps, leaves your per-user settings in place. Delete them as above.
+`sudo snap remove onviflib-gui` also removes `~/snap/onviflib-gui/`, but snapd keeps a snapshot of
+it for 31 days unless you add `--purge`; the keyring entry stays either way.
 
 ## Network communication
 
