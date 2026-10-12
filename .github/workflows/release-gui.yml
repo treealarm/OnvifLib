@@ -22,14 +22,14 @@ jobs:
         include:
           - rid: linux-x64
             runs_on: ubuntu-latest
-            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-linux64-lgpl-8.1.tar.xz
-            ffmpeg_sha: f179c8a7ea16ad8b79c188ff7d0d0ffd3a6e253614e54fcc4981e69442ca8d10
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-12-13-12/ffmpeg-n8.1.3-18-g46d899d7a0-linux64-lgpl-8.1.tar.xz
+            ffmpeg_sha: 0734ef5b56a90adaa6b4999b02c4df603e1fd29a73067839620efc7706117517
             ffmpeg_archive: ffmpeg-linux64-lgpl.tar.xz
             ffmpeg_bin: ffmpeg
           - rid: win-x64
             runs_on: ubuntu-latest
-            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-26-13-03/ffmpeg-n8.1.3-win64-lgpl-8.1.zip
-            ffmpeg_sha: 933b9625fb4b0dc2e1e96cf20fb54b94ed24ba561858418de29531fb7c88ad74
+            ffmpeg_url: https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-12-13-12/ffmpeg-n8.1.3-18-g46d899d7a0-win64-lgpl-8.1.zip
+            ffmpeg_sha: fa6c5563a794a4dc98cb521e7aad1526004149d308f99ff0ca30159b1451c522
             ffmpeg_archive: ffmpeg-win64-lgpl.zip
             ffmpeg_bin: ffmpeg.exe
 
