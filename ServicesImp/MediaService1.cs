@@ -159,6 +159,7 @@ namespace OnvifLib
       var existing = FindConfigOrThrow(resp.Configurations ?? [], config.Token, c => c.token, "VideoEncoderConfiguration");
 
       existing.Resolution = new MediaServiceReference1.VideoResolution { Width = config.Width, Height = config.Height };
+      existing.Quality = config.Quality;
 
       if (existing.RateControl != null)
       {
