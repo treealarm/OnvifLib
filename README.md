@@ -9,6 +9,7 @@
   <a href="https://www.nuget.org/packages/OnvifLib"><img src="https://img.shields.io/nuget/dt/OnvifLib.svg?style=flat-square" alt="Downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="MIT"></a>
   <a href="https://github.com/treealarm/OnvifLib/releases"><img src="https://img.shields.io/github/v/release/treealarm/OnvifLib?filter=gui-*&style=flat-square&label=GUI%20release" alt="GUI release"></a>
+  <a href="https://github.com/sponsors/treealarm"><img src="https://img.shields.io/badge/sponsor-%E2%99%A5-ea4aaa?style=flat-square&logo=githubsponsors&logoColor=white" alt="Sponsor"></a>
 </p>
 
 **OnvifLib** is a modern .NET 10 library for ONVIF IP cameras — discovery, PTZ, media URIs, events, analytics, Profile G, and Device I/O.
