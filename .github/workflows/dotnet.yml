@@ -6,6 +6,7 @@ name: .NET
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -29,5 +30,19 @@ jobs:
     - name: Pack
       run: dotnet pack --configuration Release --no-build
 
+    # A push to main is a build; a tag is a release. The tag has to name the version in
+    # OnvifLib.csproj, so a release cannot go out under the wrong number, and a version already on
+    # nuget.org fails the push instead of being skipped: --skip-duplicate once let a fix sit
+    # unpublished on main because nobody had bumped <Version>.
+    - name: Check the tag names the package version
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        version=$(dotnet msbuild OnvifLib.csproj -getProperty:Version)
+        if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+          echo "::error::tag $GITHUB_REF_NAME does not match <Version>$version</Version> in OnvifLib.csproj"
+          exit 1
+        fi
+
     - name: Push to NuGet
-      run: dotnet nuget push "**/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: dotnet nuget push "**/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}

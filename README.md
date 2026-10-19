@@ -140,3 +140,15 @@ In VS Code, press **F5** and pick a configuration. In Visual Studio, set either 
 > **Note:** do not enable trimming or NativeAOT in a consuming application.
 > `System.ServiceModel.*` builds channels, serializers and proxies by reflection with no trim
 > annotations — a trimmed build launches and then fails on the first SOAP call.
+
+## Releasing the library
+
+A push to `main` only builds. To publish to nuget.org, bump `<Version>` in
+`OnvifLib.csproj`, commit, and push a tag naming it:
+
+```bash
+git tag v1.2.2 && git push origin v1.2.2
+```
+
+The release fails if the tag and `<Version>` disagree, or if that version is already on
+nuget.org. The GUI is released separately, by `gui-*` tags.
