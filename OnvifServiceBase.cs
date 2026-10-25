@@ -49,7 +49,7 @@ namespace OnvifLib
       }
       catch (Exception ex)
       {
-        _logger?.Error($"ONVIF service initialization failed for {_url}: {ex}");
+        _logger?.Error($"ONVIF service initialization failed for {_url}: {OnvifErrors.Describe(ex)}");
       }
     }
     protected async Task<System.DateTime> GetDeviceTimeAsync()

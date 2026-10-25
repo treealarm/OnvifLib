@@ -495,13 +495,13 @@ public partial class Camera
       }
       catch (Exception retryEx)
       {
-        _logger?.Error(retryEx.ToString());
+        _logger?.Error($"ONVIF GetServices failed for {_url}: {OnvifErrors.Describe(retryEx)}");
         return null;
       }
     }
     catch (Exception ex)
     {
-      _logger?.Error(ex.ToString());
+      _logger?.Error($"ONVIF GetServices failed for {_url}: {OnvifErrors.Describe(ex)}");
       return null;
     }
   }

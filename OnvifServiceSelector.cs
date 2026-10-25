@@ -26,7 +26,7 @@ namespace OnvifLib
           }
           catch(Exception ex)
           {
-            logger?.Error(ex.ToString());
+            logger?.Error($"ONVIF {typeof(T).Name} creation failed for {url}: {OnvifErrors.Describe(ex)}");
           }
         }
       }

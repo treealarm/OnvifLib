@@ -612,7 +612,7 @@ namespace OnvifLib
         }
         catch (Exception ex)
         {
-          _logger?.Error($"Unsubscribe failed for {_url}: {ex}");
+          _logger?.Error($"Unsubscribe failed for {_url}: {OnvifErrors.Describe(ex)}");
         }
       }
       _subscriptionActive = false;

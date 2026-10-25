@@ -60,7 +60,7 @@ namespace OnvifLib
       }
       catch (Exception ex)
       {
-        _logger?.Error($"ONVIF GetCapabilities failed for {_url}: {ex}");
+        _logger?.Error($"ONVIF GetCapabilities failed for {_url}: {OnvifErrors.Describe(ex)}");
         return new PtzCapabilities(false, false, false);
       }
     }
@@ -105,7 +105,7 @@ namespace OnvifLib
       }
       catch (Exception ex)
       {
-        _logger?.Error($"ONVIF GetConfigurationOptions failed for {_url}: {ex}");
+        _logger?.Error($"ONVIF GetConfigurationOptions failed for {_url}: {OnvifErrors.Describe(ex)}");
         return null;
       }
     }
@@ -393,7 +393,7 @@ namespace OnvifLib
       }
       catch (Exception ex)
       {
-        _logger?.Error($"ONVIF GetStatus failed for {_url}: {ex}");
+        _logger?.Error($"ONVIF GetStatus failed for {_url}: {OnvifErrors.Describe(ex)}");
         return null;
       }
     }
