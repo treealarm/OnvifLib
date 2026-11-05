@@ -48,6 +48,7 @@ public static class DeviceSteps
         configs.Select(c => new List<object?> { c.Token, c.Type, c.LocalPath, c.StorageUri, c.User })));
 
     await AdministrationAsync(ctx);
+    await GeolocationAsync(ctx);
 
     // Everything below changes the device in a way the probe cannot undo.
     r.SkipDestructive("SyncTime", "SetTime", "SetSystemDateAndTime", "Reboot");
@@ -64,6 +65,41 @@ public static class DeviceSteps
       r.Skip("SendAuxiliaryCommand", $"destructive — one of [{string.Join(", ", commands)}] may format storage");
     else
       r.SkipDestructive("SendAuxiliaryCommand");
+  }
+
+  /// <summary>
+  /// Where the camera says it is. A camera on a moving vehicle reports its current pose and refuses
+  /// SetGeoLocation — that refusal is the camera's answer, not a library failure.
+  /// </summary>
+  private static async Task GeolocationAsync(ProbeContext ctx)
+  {
+    var r = ctx.Runner;
+
+    var locations = await r.StepAsync("GetGeoLocation", ctx.Camera.GetGeoLocationAsync,
+      list => r.Table(["entity", "token", "fixed", "lat", "lon", "elevation m", "yaw", "pitch", "roll", "source", "auto"],
+        list.Select(l => new List<object?>
+        {
+          l.Entity, l.Token, l.Fixed,
+          l.Location?.Latitude, l.Location?.Longitude, l.Location?.ElevationMeters,
+          l.Orientation?.Yaw, l.Orientation?.Pitch, l.Orientation?.Roll,
+          l.GeoSource, l.AutoGeo,
+        })));
+
+    if (!ctx.Options.AllowWrites) { r.SkipWrites("SetGeoLocation (no-op re-write)"); return; }
+
+    var device = locations?.FirstOrDefault(l =>
+      l.Entity.Equals("Device", StringComparison.OrdinalIgnoreCase)
+      && l.Location is { Latitude: not null, Longitude: not null });
+    if (device is null)
+    {
+      r.Skip("SetGeoLocation (no-op re-write)", locations is null
+        ? "the geolocation could not be read, so there is nothing to re-send"
+        : "the camera reported no coordinates for itself");
+      return;
+    }
+
+    await r.StepAsync($"SetGeoLocation [{device.Token}] (no-op re-write)",
+      () => ctx.Camera.SetGeoLocationAsync(device));
   }
 
   /// <summary>Users, clock, network and discovery scopes: read everything, rewrite two harmless values.</summary>

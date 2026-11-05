@@ -52,7 +52,8 @@ Windows: prefer the MSI from [Releases](https://github.com/treealarm/OnvifLib/re
 - Events (PullPoint): topic list, topic filters, synchronization point  
 - Analytics (ver20) and metadata configuration (Profile M)  
 - Profile G: search (recordings and events), replay, recordings, tracks and recording jobs  
-- Device I/O: relays and digital inputs  
+- Geolocation: where the camera says it is, with each optional coordinate kept absent rather than zero  
+- Device I/O: relays and digital inputs, and their live state from `Device/Trigger` property events  
 - WS-Security UsernameToken  
 - Target: **.NET 10**
 
@@ -119,6 +120,44 @@ if (!result.ScanOk)
 
 foreach (var device in result.Devices)
     Console.WriteLine($"{device.Name} at {device.Ip}:{device.Port}");
+```
+
+### Geolocation
+
+`GetGeoLocationAsync` reports where the camera says it is on the Earth. The ONVIF schema makes each
+coordinate optional, and the library keeps that: a value the camera did not send is `null`, not `0`.
+
+```csharp
+foreach (var place in await camera.GetGeoLocationAsync())
+    Console.WriteLine($"{place.Entity} {place.Token}: " +
+                      $"{place.Location?.Latitude}, {place.Location?.Longitude} at {place.Location?.ElevationMeters} m");
+
+// Move a fixed camera. A vehicle-mounted one refuses (ActionNotSupported) — its place is the
+// vehicle's, and GetGeoLocationAsync reports it.
+await camera.SetGeoLocationAsync(new OnvifLocationEntity(
+    "Device", "cam1", new OnvifGeoLocation(38.9923, -76.9378, 12.5)));
+```
+
+### Live relay and input state
+
+ONVIF has no getter for the live state of a relay output or a digital input: it travels as
+`Device/Trigger` property events. `DeviceIoStateWatcher` opens a topic-filtered pull point, keeps a
+snapshot, and raises `StateChanged`. Subscribing replays the current state as `Initialized`, so the
+snapshot is filled without waiting for anything to move.
+
+```csharp
+if (await camera.GetEventService() is { } events)
+{
+    // The watcher takes the event service's subscription over — give it one nothing else uses.
+    await using var io = await DeviceIoStateWatcher.CreateAsync(events);
+
+    await Task.Delay(1000);   // the Initialized snapshot arrives with the first pull
+
+    if (io.TryGetState(DeviceIoKind.Relay, "relay1", out var relay))
+        Console.WriteLine($"relay1 energised: {relay.LogicalState}, contact closed: {relay.ContactClosed}");
+    if (io.TryGetState(DeviceIoKind.DigitalInput, "input1", out var input))
+        Console.WriteLine($"input1: {input.LogicalState}");
+}
 ```
 
 ---

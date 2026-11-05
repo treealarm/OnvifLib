@@ -3,7 +3,8 @@ namespace OnvifLib.Probe.Steps;
 /// <summary>
 /// Device I/O: relay outputs and digital inputs. Note the split — relays are read and driven
 /// through <c>Camera</c> (they live on Device Management), while their options and the digital
-/// inputs come from <c>DeviceIOService2</c>.
+/// inputs come from <c>DeviceIOService2</c>. Their live state is neither: ONVIF carries it as
+/// Device/Trigger property events, which <c>DeviceIoStateWatcher</c> collects.
 /// </summary>
 public static class DeviceIoSteps
 {
@@ -12,13 +13,12 @@ public static class DeviceIoSteps
     var r = ctx.Runner;
     r.Section(Sections.DeviceIo, "deviceio");
 
-    await RelaysAsync(ctx);
-    await DigitalInputsAsync(ctx);
-
-    r.Note("ONVIF reports no live state for a relay or an input — neither the probe nor the GUI can show one");
+    var relays = await RelaysAsync(ctx);
+    var inputs = await DigitalInputsAsync(ctx);
+    await LiveStateAsync(ctx, relays, inputs);
   }
 
-  private static async Task RelaysAsync(ProbeContext ctx)
+  private static async Task<List<OnvifRelayOutput>?> RelaysAsync(ProbeContext ctx)
   {
     var r = ctx.Runner;
 
@@ -39,7 +39,7 @@ public static class DeviceIoSteps
     {
       r.Skip("SetRelayOutputSettings", "no relay outputs");
       r.Skip("SetRelayOutputState", "no relay outputs");
-      return;
+      return relays;
     }
 
     if (ctx.Options.AllowWrites)
@@ -51,7 +51,7 @@ public static class DeviceIoSteps
     if (!ctx.Options.AllowRelay)
     {
       r.Skip("SetRelayOutputState", "requires --allow-relay — a relay is usually wired to a door, gate or alarm");
-      return;
+      return relays;
     }
 
     await r.StepAsync($"SetRelayOutputState [{first.Token}] active → inactive", async () =>
@@ -63,9 +63,11 @@ public static class DeviceIoSteps
         await ctx.Camera.SetRelayOutputStateAsync(first.Token, false);
       }
     });
+
+    return relays;
   }
 
-  private static async Task DigitalInputsAsync(ProbeContext ctx)
+  private static async Task<List<OnvifDigitalInput>?> DigitalInputsAsync(ProbeContext ctx)
   {
     var r = ctx.Runner;
     if (ctx.DeviceIo is not { } io)
@@ -73,7 +75,7 @@ public static class DeviceIoSteps
       r.Skip("GetDigitalInputs", "deviceIO service not available");
       r.Skip("GetDigitalInputConfigurationOptions", "deviceIO service not available");
       r.Skip("SetDigitalInputIdleState", "deviceIO service not available");
-      return;
+      return null;
     }
 
     var inputs = await r.StepAsync("GetDigitalInputs", io.GetDigitalInputsAsync,
@@ -85,7 +87,7 @@ public static class DeviceIoSteps
     {
       r.Skip("GetDigitalInputConfigurationOptions", "no digital inputs");
       r.Skip("SetDigitalInputIdleState", "no digital inputs");
-      return;
+      return inputs;
     }
 
     var options = await r.StepAsync($"GetDigitalInputConfigurationOptions [{first.Token}]",
@@ -93,11 +95,52 @@ public static class DeviceIoSteps
                   ?? throw new ProbeFailure("the camera reported no options for this input"),
       o => r.Value("idle state configurable", o.IdleStateConfigurable));
 
-    if (!ctx.Options.AllowWrites) { r.SkipWrites("SetDigitalInputIdleState"); return; }
-    if (options is { IdleStateConfigurable: false }) { r.Skip("SetDigitalInputIdleState", "the camera reports the idle state as fixed"); return; }
-    if (first.IdleState is not { Length: > 0 } idleState) { r.Skip("SetDigitalInputIdleState", "the camera did not report a current idle state to re-send"); return; }
+    if (!ctx.Options.AllowWrites) { r.SkipWrites("SetDigitalInputIdleState"); return inputs; }
+    if (options is { IdleStateConfigurable: false }) { r.Skip("SetDigitalInputIdleState", "the camera reports the idle state as fixed"); return inputs; }
+    if (first.IdleState is not { Length: > 0 } idleState) { r.Skip("SetDigitalInputIdleState", "the camera did not report a current idle state to re-send"); return inputs; }
 
     await r.StepAsync($"SetDigitalInputIdleState [{first.Token}] = {idleState} (no-op re-write)",
       () => io.SetDigitalInputIdleStateAsync(first.Token, idleState));
+
+    return inputs;
+  }
+
+  /// <summary>
+  /// Subscribes to the Device/Trigger property events and prints the state the camera reports for
+  /// each device. The subscription replays the current state as "Initialized", so a camera with
+  /// nothing moving still answers as soon as the watcher starts.
+  /// </summary>
+  private static async Task LiveStateAsync(ProbeContext ctx,
+    List<OnvifRelayOutput>? relays, List<OnvifDigitalInput>? inputs)
+  {
+    var r = ctx.Runner;
+
+    var expected = (relays?.Count ?? 0) + (inputs?.Count ?? 0);
+    if (expected == 0) { r.Skip("DeviceIoStateWatcher", "no relay outputs or digital inputs"); return; }
+    if (ctx.Events is not { } events) { r.Skip("DeviceIoStateWatcher", "event service not available"); return; }
+
+    await r.StepAsync("DeviceIoStateWatcher (live state)", async () =>
+    {
+      // The watcher takes the event service over, which is fine here: the events section has
+      // finished and stopped receiving, and this is the last section that uses it.
+      await using var watcher = await DeviceIoStateWatcher.CreateAsync(events, ctx.Logger);
+
+      // "Initialized" arrives with the first pull, but an unwired input may report nothing at all,
+      // so wait for the set to settle rather than for it to fill.
+      var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
+      while (DateTime.UtcNow < deadline && watcher.States.Count < expected)
+        await Task.Delay(200, ctx.Cancellation);
+
+      var states = watcher.States.OrderBy(s => s.Kind).ThenBy(s => s.Token, StringComparer.Ordinal).ToList();
+      if (states.Count == 0)
+        throw new ProbeFailure("the camera sent no Device/Trigger property events within 8 s");
+
+      r.Table(["kind", "token", "logical", "contact", "event", "reported at"],
+        states.Select(s => new List<object?>
+          { s.Kind, s.Token, s.LogicalState, s.ContactClosed, s.PropertyOperation, s.Time }));
+
+      if (states.Count < expected)
+        r.Note($"{expected - states.Count} relay(s)/input(s) reported no state — an unwired input may have none");
+    });
   }
 }

@@ -7,7 +7,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
     <PackageId>OnvifLib</PackageId>
-    <Version>1.2.2</Version>
+    <Version>1.3.0</Version>
     <Authors>Danil Serov</Authors>
     <Company>TreeAlarm</Company>
     <Copyright>Copyright (c) TreeAlarm</Copyright>
@@ -17,7 +17,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>1.2.0: Cameras that do not answer GetServices (ONVIF 1.x/2.0) are now reached through GetCapabilities (Camera.UsedCapabilitiesFallback says which). Events: GetEventProperties, GetServiceCapabilities, SetSynchronizationPoint and topic filters (EventService1.SetTopicFilterAsync). Imaging: IR cut filter, exposure, white balance, WDR, backlight compensation and focus configuration, plus focus moves and status. PTZ: home position, nodes, auxiliary commands and a speed for GotoPreset. Device administration on Camera: users, date/time mode and time zone, network interfaces, DNS, NTP, hostname, protocols, gateway and discovery scopes. Media: OSD and video source configurations. Profile G: recording options, creating recordings, tracks and jobs, job configuration and state, and FindEvents. OnvifImagingSettings, OnvifImagingOptions and OnvifProfileInfo gained optional trailing members — source-compatible, but consumers must recompile. Fixes: Media1 profiles now report the physical video source in VideoSourceToken (it was the configuration token, which Imaging rejects on cameras where the two differ; the configuration token is now VideoSourceConfigToken); SetTimeAsync keeps the camera time zone and DST flag instead of clearing them.</PackageReleaseNotes>
+    <PackageReleaseNotes>1.3.0: Geolocation on Camera — GetGeoLocationAsync and SetGeoLocationAsync, with the ONVIF *Specified flags honoured so a coordinate the camera did not report is absent rather than zero. Device I/O live state: DeviceIoStateWatcher opens a topic-filtered pull point on Device/Trigger/Relay and Device/Trigger/DigitalInput, where the Initialized snapshot gives each relay's and input's current state and Changed gives every update, and keeps it as a TryGetState snapshot with a change event. DeviceIoState carries a relay's logical state and contact. The probe gains geolocation steps and shows live relay and input state. New unit tests project (not packaged).</PackageReleaseNotes>
 
     <!-- XML docs ship with the package so consumers get IntelliSense on the public API. CS1591
          ("missing XML comment") is suppressed rather than chased: most of the public surface is
@@ -64,10 +64,18 @@
   </ItemGroup>
   <ItemGroup>
     <!-- This project sits at the repository root, so the SDK's default **/*.cs glob would
-         compile the sample applications into the library itself. They are separate projects
-         with their own csproj files and must stay out. -->
+         compile the sample applications and the tests into the library itself. They are
+         separate projects with their own csproj files and must stay out. -->
     <Compile Remove="samples/**" />
     <None Remove="samples/**" />
     <EmbeddedResource Remove="samples/**" />
+    <Compile Remove="tests/**" />
+    <None Remove="tests/**" />
+    <EmbeddedResource Remove="tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The mapper's *Specified handling and the event parser are internal, tested directly. -->
+    <InternalsVisibleTo Include="OnvifLib.Tests" />
   </ItemGroup>
 </Project>

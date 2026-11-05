@@ -22,13 +22,13 @@ jobs:
       with:
         dotnet-version: 10.0.x
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore OnvifLib.sln
     - name: Build
-      run: dotnet build --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+      run: dotnet build OnvifLib.sln --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
     - name: Test
-      run: dotnet test --no-build --verbosity normal
+      run: dotnet test OnvifLib.sln --configuration Release --no-build --verbosity normal
     - name: Pack
-      run: dotnet pack --configuration Release --no-build
+      run: dotnet pack OnvifLib.csproj --configuration Release --no-build
 
     # A push to main is a build; a tag is a release. The tag has to name the version in
     # OnvifLib.csproj, so a release cannot go out under the wrong number, and a version already on

@@ -72,7 +72,7 @@ it exists and was not exercised.
 - OSD: a text OSD created on a free slot, re-written unchanged, and deleted. The camera's own
   OSDs are never touched, and nothing is created when the configuration has no free slot.
 - Configurations: `SetVideoEncoderConfig`, `SetAudioEncoderConfig`, `SetMetadataConfig`,
-  `SetRelayOutputSettings`, `SetDigitalInputIdleState`, `SetHostname` and `SetScopes` are re-sent
+  `SetRelayOutputSettings`, `SetDigitalInputIdleState`, `SetGeoLocation`, `SetHostname` and `SetScopes` are re-sent
   with exactly the values that were just read — a no-op write that proves the call is accepted
   without choosing settings the camera might not support.
 
@@ -129,8 +129,10 @@ as a camera that lacks Profile G and not as a broken library.
 - **Replay URIs are frequently single-use.** Fetch a fresh one immediately before each playback.
 - **Recording timestamps are in the camera's clock.** The `recording` section prints both the raw
   camera time and its equivalent in ours, using the offset the `device` section measured.
-- **Relays and digital inputs have no readable state.** ONVIF does not expose one, so neither the
-  probe nor a GUI can show a live indicator — only the last command that was sent.
+- **Relays and digital inputs have no getter for their live state.** ONVIF carries it as
+  `Device/Trigger` property events instead, and the `deviceio` section subscribes with
+  `DeviceIoStateWatcher` and prints what arrives — the `Initialized` snapshot of every device,
+  without needing anything to move.
 
 ## Requirements
 
