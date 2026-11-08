@@ -7,7 +7,7 @@
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 
     <PackageId>OnvifLib</PackageId>
-    <Version>1.3.0</Version>
+    <Version>1.3.1</Version>
     <Authors>Danil Serov</Authors>
     <Company>TreeAlarm</Company>
     <Copyright>Copyright (c) TreeAlarm</Copyright>
@@ -17,7 +17,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReleaseNotes>1.3.0: Geolocation on Camera — GetGeoLocationAsync and SetGeoLocationAsync, with the ONVIF *Specified flags honoured so a coordinate the camera did not report is absent rather than zero. Device I/O live state: DeviceIoStateWatcher opens a topic-filtered pull point on Device/Trigger/Relay and Device/Trigger/DigitalInput, where the Initialized snapshot gives each relay's and input's current state and Changed gives every update, and keeps it as a TryGetState snapshot with a change event. DeviceIoState carries a relay's logical state and contact. The probe gains geolocation steps and shows live relay and input state. New unit tests project (not packaged).</PackageReleaseNotes>
+    <PackageReleaseNotes>1.3.1: Pull points are released, not abandoned. EventService1 gains DisposeAsync (Dispose does the same for synchronous callers): it stops the receive loop, waits for it, unsubscribes over the still-open subscription manager with a bounded deadline, and only then closes the clients. The old order closed the clients under the loop, so its Unsubscribe was lost and the camera kept the pull point — a camera with a small MaxPullPoints ran out after a series of restarts and then refused every new subscription. Re-subscribing now releases the old pull point first on both paths, including after a fault, so a camera at its cap frees a slot instead of losing the subscription for good. StopReceivingAsync now stops deterministically, and a refused CreatePullPointSubscription logs the camera's advertised MaxPullPoints. 1.3.0: Geolocation on Camera — GetGeoLocationAsync and SetGeoLocationAsync, with the ONVIF *Specified flags honoured so a coordinate the camera did not report is absent rather than zero. Device I/O live state: DeviceIoStateWatcher opens a topic-filtered pull point on Device/Trigger/Relay and Device/Trigger/DigitalInput, where the Initialized snapshot gives each relay's and input's current state and Changed gives every update, and keeps it as a TryGetState snapshot with a change event. DeviceIoState carries a relay's logical state and contact. The probe gains geolocation steps and shows live relay and input state. New unit tests project (not packaged).</PackageReleaseNotes>
 
     <!-- XML docs ship with the package so consumers get IntelliSense on the public API. CS1591
          ("missing XML comment") is suppressed rather than chased: most of the public surface is
