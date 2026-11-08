@@ -256,6 +256,11 @@ namespace OnvifLib
       return string.Join(" ", topic.Any.Select(n => n.InnerText ?? n.OuterXml ?? string.Empty)).Trim();
     }
 
+    /// <remarks>
+    /// Stopping is what releases the watcher's pull point: <see cref="EventService1.StopReceivingAsync"/>
+    /// unsubscribes over the still-open subscription-manager client before it returns, bounded. The
+    /// service itself is left open — its owner disposes it.
+    /// </remarks>
     public async ValueTask DisposeAsync()
     {
       if (_disposed) return;

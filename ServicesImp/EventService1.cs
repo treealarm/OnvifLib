@@ -7,7 +7,7 @@ using DateTime = System.DateTime;
 
 namespace OnvifLib
 {
-  public class EventService1 : OnvifServiceBase, IOnvifServiceFactory<EventService1>
+  public class EventService1 : OnvifServiceBase, IOnvifServiceFactory<EventService1>, IAsyncDisposable
   {
     public const string WSDL_EVENTS = "http://www.onvif.org/ver10/events/wsdl";
     public const string WSDL_MEDIA  = "http://www.onvif.org/ver10/media/wsdl";
@@ -17,6 +17,15 @@ namespace OnvifLib
     public const string OnvifTopicsNamespace = "http://www.onvif.org/ver10/topics";
     private const string WsTopicsNamespace = "http://docs.oasis-open.org/wsn/t-1";
     private const string WsNotificationNamespace = "http://docs.oasis-open.org/wsn/b-2";
+
+    // How long a stop waits for the receive loop to finish, and how long an Unsubscribe may take
+    // before the pull point is left to the camera's own termination time. Both are deliberately
+    // short: creating a subscription also goes through this path, and a camera at its pull-point
+    // cap that refuses the new one must not cost the caller a binding timeout first.
+    private static readonly TimeSpan StopDeadline = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan UnsubscribeDeadline = TimeSpan.FromSeconds(2);
+    // Asking a camera that just refused a subscription for its capabilities costs the same order.
+    private static readonly TimeSpan CapabilitiesDeadline = TimeSpan.FromSeconds(2);
 
     private EventPortTypeClient? _eventClient1;
     private PullPointSubscriptionClient? _pullClient;
@@ -43,10 +52,13 @@ namespace OnvifLib
     public event Action<NotificationMessageHolderType[]>? OnEventReceived;
 
     private Task? _loopTask;
-    // True between a successful CreatePullPointSubscription and the Unsubscribe the receive loop
-    // sends when it stops. Lets a restart and a filter change know whether there is a live pull
-    // point to reuse or to release.
+    // True between a successful CreatePullPointSubscription and the Unsubscribe that releases it.
+    // Lets a restart, a filter change and a dispose know whether there is a pull point to release.
     private volatile bool _subscriptionActive;
+    // Serialises the release: the receive loop does one on its way out, and a dispose or a
+    // re-subscribe may reach for the same pull point at the same moment. Exactly one of them wins.
+    private readonly SemaphoreSlim _unsubscribeGate = new(1, 1);
+    private int _disposed;
 
     // Prefix → namespace, learned from GetEventProperties, so a filter naming a vendor topic
     // (tnsaxis:, tns1: …) can declare the namespace its prefix stands for.
@@ -155,22 +167,18 @@ namespace OnvifLib
     /// Tears down the (likely invalid) pull point and subscription manager, then runs the
     /// full subscribe process again from scratch.
     /// </summary>
-    /// <param name="unsubscribeFirst">
-    /// Release the current pull point before creating the next one. Wanted when the old one is
-    /// still alive (a filter change): cameras keep only a few pull points, and abandoning one per
-    /// change runs them out. Not wanted on the fault path — the endpoint is already dead, and an
-    /// Unsubscribe sent to it would only sit out the binding timeout.
-    /// </param>
-    private async Task ResubscribeAsync(bool unsubscribeFirst = false)
+    /// <remarks>
+    /// The old pull point is released first, and on both paths that lead here. A camera keeps only
+    /// a handful of them, and every one abandoned is one the next subscribe cannot have: after a
+    /// filter change the old subscription is certainly alive, and after a fault it may well be too
+    /// — a failed pull says the endpoint stopped answering, not that the camera forgot it. A dead
+    /// endpoint costs the bounded <see cref="UnsubscribeDeadline"/> and nothing more.
+    /// </remarks>
+    private async Task ResubscribeAsync()
     {
       _logger?.Info($"Re-subscribing pull point for {_url}");
 
-      if (unsubscribeFirst && _subscriptionActive && _subscriptionManagerClient?.State == CommunicationState.Opened)
-      {
-        try { await _subscriptionManagerClient.UnsubscribeAsync(new Unsubscribe()); }
-        catch (Exception ex) { _logger?.Warning($"Unsubscribe before re-subscribe failed for {_url}: {ex.Message}"); }
-      }
-      _subscriptionActive = false;
+      await UnsubscribeAsync(UnsubscribeDeadline).ConfigureAwait(false);
 
       try { _pullClient?.Abort(); } catch { }
       try { _subscriptionManagerClient?.Abort(); } catch { }
@@ -189,7 +197,24 @@ namespace OnvifLib
       await SetupPullPointAsync();
     }
 
+    /// <summary>
+    /// Creates the pull point, trying the termination-time spellings cameras differ on, and says
+    /// what the camera allows when none of them is accepted.
+    /// </summary>
     private async Task<CreatePullPointSubscriptionResponse> CreateSubscriptionAsync()
+    {
+      try
+      {
+        return await CreateSubscriptionCoreAsync().ConfigureAwait(false);
+      }
+      catch (Exception ex)
+      {
+        await LogRefusedSubscriptionAsync(ex).ConfigureAwait(false);
+        throw;
+      }
+    }
+
+    private async Task<CreatePullPointSubscriptionResponse> CreateSubscriptionCoreAsync()
     {
       UnacceptableInitialTerminationTimeFaultType? lastFault;
       var filter = BuildFilter();
@@ -231,6 +256,38 @@ namespace OnvifLib
 
       // Try 3: no time — let camera pick its own TTL
       return await _eventClient1!.CreatePullPointSubscriptionAsync(new CreatePullPointSubscriptionRequest { Filter = filter });
+    }
+
+    /// <summary>
+    /// Says why the camera would not give us a pull point, in the camera's own terms.
+    /// </summary>
+    /// <remarks>
+    /// The usual cause is its advertised <c>MaxPullPoints</c> being used up — by this client's own
+    /// abandoned subscriptions, or by another client on the camera — and without that number in
+    /// the log the failure looks like any other. Best effort: a camera that has just refused a
+    /// subscription may refuse this too, and that must not replace the original exception.
+    /// </remarks>
+    private async Task LogRefusedSubscriptionAsync(Exception failure)
+    {
+      var limit = await ReadMaxPullPointsAsync().ConfigureAwait(false);
+      var allowance = limit is { } max ? $"; it allows {max} pull points at a time" : string.Empty;
+      _logger?.Warning($"The camera at {_url} refused a new pull point{allowance}: {OnvifErrors.Describe(failure)}");
+    }
+
+    private async Task<int?> ReadMaxPullPointsAsync()
+    {
+      try
+      {
+        if (_eventClient1 is not { State: CommunicationState.Opened })
+          return null;
+        var capabilities = await _eventClient1.GetServiceCapabilitiesAsync()
+          .WaitAsync(CapabilitiesDeadline).ConfigureAwait(false);
+        return capabilities?.MaxPullPointsSpecified == true ? capabilities.MaxPullPoints : null;
+      }
+      catch
+      {
+        return null;
+      }
     }
 
     /// <summary>
@@ -328,7 +385,7 @@ namespace OnvifLib
       TopicFilter = next;
       try
       {
-        await ResubscribeAsync(unsubscribeFirst: true);
+        await ResubscribeAsync();
       }
       catch
       {
@@ -442,13 +499,102 @@ namespace OnvifLib
       });
     }
 
+    /// <summary>
+    /// Stops the receive loop and releases the pull point.
+    /// </summary>
+    /// <remarks>
+    /// Cancelling the token alone is not enough to make that deterministic. The loop may be inside
+    /// a long-poll, which a dead or silent endpoint holds for the whole SendTimeout, so the pull
+    /// client is aborted to break it; only then is the loop waited for, and whatever it did not
+    /// release is released here over the subscription-manager client, which stays open for it.
+    /// </remarks>
     public async Task StopReceivingAsync()
     {
       if (_cts == null)
-      {
         return;
+
+      await _cts.CancelAsync().ConfigureAwait(false);
+      try { _pullClient?.Abort(); } catch { }
+
+      await WaitForReceiveLoopAsync(StopDeadline).ConfigureAwait(false);
+      await UnsubscribeAsync(UnsubscribeDeadline).ConfigureAwait(false);
+    }
+
+    /// <summary>Waits for the receive loop to finish, bounded — a loop stuck on a dead camera
+    /// must not hold the caller for the binding timeout.</summary>
+    private async Task WaitForReceiveLoopAsync(TimeSpan deadline)
+    {
+      if (_loopTask is not { IsCompleted: false } loop)
+        return;
+
+      try
+      {
+        await loop.WaitAsync(deadline).ConfigureAwait(false);
       }
-      await _cts.CancelAsync();
+      catch (TimeoutException)
+      {
+        _logger?.Warning($"The receive loop for {_url} did not stop within {deadline.TotalSeconds:0.#} s");
+      }
+      catch (Exception)
+      {
+        // The loop logs its own failures where they happen; here only its completion matters.
+      }
+    }
+
+    /// <summary>
+    /// Releases the current pull point over the subscription-manager client, once.
+    /// </summary>
+    /// <remarks>
+    /// Bounded, because this is also the path a fault takes: a camera that stopped answering would
+    /// otherwise hold the caller for the binding's full SendTimeout. Abandoning the call after the
+    /// deadline still releases the pull point — the request is on its way, and a camera that never
+    /// receives it reclaims the subscription by its termination time, which is what the leak this
+    /// exists to stop relied on in the first place.
+    /// </remarks>
+    private async Task UnsubscribeAsync(TimeSpan deadline)
+    {
+      await _unsubscribeGate.WaitAsync().ConfigureAwait(false);
+      try
+      {
+        if (!_subscriptionActive)
+          return;
+        _subscriptionActive = false;
+
+        if (_subscriptionManagerClient is not { State: CommunicationState.Opened } client)
+          return;
+
+        try
+        {
+          await client.UnsubscribeAsync(new Unsubscribe()).WaitAsync(deadline).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+          _logger?.Warning($"Unsubscribe from {_url} did not answer within {deadline.TotalSeconds:0.#} s; abandoning the call");
+          try { client.Abort(); } catch { }
+        }
+        catch (Exception ex)
+        {
+          _logger?.Warning($"Unsubscribe failed for {_url}: {OnvifErrors.Describe(ex)}");
+        }
+      }
+      finally
+      {
+        _unsubscribeGate.Release();
+      }
+    }
+
+    /// <summary>A back-off that gives up at once when the service is stopping.</summary>
+    private static async Task<bool> DelayAsync(TimeSpan delay, CancellationToken token)
+    {
+      try
+      {
+        await Task.Delay(delay, token).ConfigureAwait(false);
+        return true;
+      }
+      catch (OperationCanceledException)
+      {
+        return false;
+      }
     }
 
     private async Task<bool> ReceiveLoopAsync(CancellationToken token)
@@ -463,7 +609,7 @@ namespace OnvifLib
         {
           try
           {
-            await ResubscribeAsync(unsubscribeFirst: !needsResubscribe);
+            await ResubscribeAsync();
             filterChange.Done.TrySetResult();
             needsResubscribe = false;
           }
@@ -507,7 +653,8 @@ namespace OnvifLib
             }
 
             needsResubscribe = true;
-            await Task.Delay(2000);
+            if (!await DelayAsync(TimeSpan.FromSeconds(2), token))
+              break;
             continue;
           }
           needsResubscribe = false;
@@ -580,6 +727,12 @@ namespace OnvifLib
             await RenewSubscriptionAsync();
           }
         }
+        catch (Exception) when (token.IsCancellationRequested)
+        {
+          // A stop broke the pull by aborting the client. That is the stop working, not a camera
+          // that needs re-subscribing — the loop ends below and releases the pull point.
+          break;
+        }
         catch (Exception ex)
         {
           // Pull or renew failed — the pull point is likely terminated/invalid. Only the
@@ -598,24 +751,16 @@ namespace OnvifLib
 
           // Force a full re-subscribe on the next iteration instead of hammering a dead endpoint.
           needsResubscribe = true;
-          await Task.Delay(2000);
+          if (!await DelayAsync(TimeSpan.FromSeconds(2), token))
+            break;
         }
       }
 
       Interlocked.Exchange(ref _pendingFilterChange, null)?.Done.TrySetCanceled();
 
-      if (_subscriptionManagerClient != null && _subscriptionActive)
-      {
-        try
-        {
-          await _subscriptionManagerClient.UnsubscribeAsync(new Unsubscribe());
-        }
-        catch (Exception ex)
-        {
-          _logger?.Error($"Unsubscribe failed for {_url}: {OnvifErrors.Describe(ex)}");
-        }
-      }
-      _subscriptionActive = false;
+      // The loop owns the pull point while it runs, so it releases it on the way out — bounded,
+      // and the same call a dispose or a re-subscribe makes, which makes it happen exactly once.
+      await UnsubscribeAsync(UnsubscribeDeadline).ConfigureAwait(false);
       return true;
     }
 
@@ -649,15 +794,45 @@ namespace OnvifLib
       _subscriptionExpiry = renewResult?.RenewResponse.TerminationTime ?? DateTime.UtcNow + _terminationTime;
     }
 
-    public override void Dispose()
+    /// <summary>
+    /// Stops receiving, releases the pull point and closes the clients.
+    /// </summary>
+    /// <remarks>
+    /// This is the way to dispose the service: the pull point is the camera's resource, and only a
+    /// release that completes before the clients close is a release at all. <see cref="Dispose"/>
+    /// does the same for callers that cannot await.
+    /// </remarks>
+    public async ValueTask DisposeAsync()
     {
-      // Stop the background receive loop first, otherwise it keeps running on the
-      // closed clients, faults, and tries to re-subscribe to a disposed service.
-      try { _cts?.Cancel(); } catch { }
+      if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        return;
+
+      try
+      {
+        await StopReceivingAsync().ConfigureAwait(false);
+      }
+      catch (Exception ex)
+      {
+        _logger?.Warning($"Stopping the receive loop for {_url} failed: {OnvifErrors.Describe(ex)}");
+      }
+
+      // A service that was created but never started (or whose start failed) still holds the pull
+      // point created with it; releasing it is this object's job too.
+      await UnsubscribeAsync(UnsubscribeDeadline).ConfigureAwait(false);
+
       try { _eventClient1?.Close(); } catch { }
       try { _pullClient?.Close(); } catch { }
       try { _subscriptionManagerClient?.Close(); } catch { }
       base.Dispose();
+    }
+
+    public override void Dispose()
+    {
+      // Synchronous callers (a `using`, a session torn down by a sample) cannot await, and
+      // skipping the release is exactly what leaked pull points. Every await on this path is
+      // bounded and does not capture a synchronization context, so blocking a UI thread here
+      // cannot deadlock on its own dispatcher.
+      DisposeAsync().AsTask().GetAwaiter().GetResult();
     }
   }
 }
