@@ -26,6 +26,14 @@ namespace OnvifLib
     private static readonly TimeSpan UnsubscribeDeadline = TimeSpan.FromSeconds(2);
     // Asking a camera that just refused a subscription for its capabilities costs the same order.
     private static readonly TimeSpan CapabilitiesDeadline = TimeSpan.FromSeconds(2);
+    // How long a failed pull or re-subscribe waits before trying again. A returning camera is
+    // serviced again within one delay, which is what a motion alarm cares about.
+    private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(2);
+    // A camera that stays off must not cost a line every retry: the first failure is reported at
+    // once, then each report waits twice as long, up to five minutes — the shape video_srv's
+    // rtsp_reader uses. The retries themselves keep the RetryDelay cadence.
+    private static readonly TimeSpan FailureReportInterval = RetryDelay;
+    private static readonly TimeSpan MaxFailureReportInterval = TimeSpan.FromMinutes(5);
 
     private EventPortTypeClient? _eventClient1;
     private PullPointSubscriptionClient? _pullClient;
@@ -59,6 +67,10 @@ namespace OnvifLib
     // re-subscribe may reach for the same pull point at the same moment. Exactly one of them wins.
     private readonly SemaphoreSlim _unsubscribeGate = new(1, 1);
     private int _disposed;
+
+    // How often a run of consecutive failures reaches the log; the receive loop is its only writer.
+    private readonly FailureBackoff _failureBackoff =
+      new(FailureReportInterval, MaxFailureReportInterval);
 
     // Prefix → namespace, learned from GetEventProperties, so a filter naming a vendor topic
     // (tnsaxis:, tns1: …) can declare the namespace its prefix stands for.
@@ -109,7 +121,7 @@ namespace OnvifLib
         _password);
       await _eventClient1.OpenAsync();
 
-      await SetupPullPointAsync();
+      await SetupPullPointAsync(reportRefusal: true);
     }
 
     /// <summary>
@@ -117,9 +129,9 @@ namespace OnvifLib
     /// opens the pull / subscription-manager channels for it. Used on first init and on
     /// re-subscribe after the pull point becomes invalid.
     /// </summary>
-    private async Task SetupPullPointAsync()
+    private async Task SetupPullPointAsync(bool reportRefusal)
     {
-      var subscriptionResponse = await CreateSubscriptionAsync();
+      var subscriptionResponse = await CreateSubscriptionAsync(reportRefusal);
 
       _subscriptionExpiry = subscriptionResponse.TerminationTime ?? DateTime.UtcNow + _terminationTime;
 
@@ -174,10 +186,13 @@ namespace OnvifLib
     /// — a failed pull says the endpoint stopped answering, not that the camera forgot it. A dead
     /// endpoint costs the bounded <see cref="UnsubscribeDeadline"/> and nothing more.
     /// </remarks>
-    private async Task ResubscribeAsync()
+    /// <param name="reportRefusal">
+    /// Whether a refused subscription is worth a warning here. True for the paths a person asked
+    /// for (the first subscription, a filter change); false for the receive loop, which reports the
+    /// whole run of failures on its own schedule.
+    /// </param>
+    private async Task ResubscribeAsync(bool reportRefusal = true)
     {
-      _logger?.Info($"Re-subscribing pull point for {_url}");
-
       await UnsubscribeAsync(UnsubscribeDeadline).ConfigureAwait(false);
 
       try { _pullClient?.Abort(); } catch { }
@@ -194,14 +209,14 @@ namespace OnvifLib
         _password);
       await _eventClient1.OpenAsync();
 
-      await SetupPullPointAsync();
+      await SetupPullPointAsync(reportRefusal);
     }
 
     /// <summary>
     /// Creates the pull point, trying the termination-time spellings cameras differ on, and says
     /// what the camera allows when none of them is accepted.
     /// </summary>
-    private async Task<CreatePullPointSubscriptionResponse> CreateSubscriptionAsync()
+    private async Task<CreatePullPointSubscriptionResponse> CreateSubscriptionAsync(bool reportRefusal)
     {
       try
       {
@@ -209,7 +224,10 @@ namespace OnvifLib
       }
       catch (Exception ex)
       {
-        await LogRefusedSubscriptionAsync(ex).ConfigureAwait(false);
+        // The receive loop reports its own failures on the backoff schedule; asking a camera that
+        // is off for its capabilities on every retry would only add a dead round trip per attempt.
+        if (reportRefusal)
+          await LogRefusedSubscriptionAsync(ex).ConfigureAwait(false);
         throw;
       }
     }
@@ -269,9 +287,18 @@ namespace OnvifLib
     /// </remarks>
     private async Task LogRefusedSubscriptionAsync(Exception failure)
     {
-      var limit = await ReadMaxPullPointsAsync().ConfigureAwait(false);
-      var allowance = limit is { } max ? $"; it allows {max} pull points at a time" : string.Empty;
+      var allowance = await PullPointAllowanceAsync().ConfigureAwait(false);
       _logger?.Warning($"The camera at {_url} refused a new pull point{allowance}: {OnvifErrors.Describe(failure)}");
+    }
+
+    /// <summary>
+    /// The camera's own pull-point allowance, as a clause for a log line, or empty when the camera
+    /// did not answer. An unreachable camera has no open event client, so this costs it nothing.
+    /// </summary>
+    private async Task<string> PullPointAllowanceAsync()
+    {
+      var limit = await ReadMaxPullPointsAsync().ConfigureAwait(false);
+      return limit is { } max ? $"; it allows {max} pull points at a time" : string.Empty;
     }
 
     private async Task<int?> ReadMaxPullPointsAsync()
@@ -356,6 +383,9 @@ namespace OnvifLib
     {
       var next = string.IsNullOrWhiteSpace(topicExpression) ? null : topicExpression.Trim();
       var previous = TopicFilter;
+      // The receive loop no longer announces every re-subscribe: that line was most of what an
+      // off camera cost the log. A filter change is an operator action and still says so, once.
+      _logger?.Info($"Applying topic filter '{next ?? "none"}' for {_url}");
 
       if (IsReceiving)
       {
@@ -624,14 +654,21 @@ namespace OnvifLib
 
         if (needsResubscribe || _pullClient == null || _pullClient.State == CommunicationState.Faulted)
         {
+          // Decided before the attempt and reported after it: a camera that stays off writes one
+          // line per doubling interval, not one per retry. The attempt itself still runs at
+          // RetryDelay, so a returning camera is picked up again within it.
+          var report = _failureBackoff.Due(DateTime.UtcNow);
           try
           {
-            await ResubscribeAsync();
+            // reportRefusal: false — this loop is the one place that reports these failures; a
+            // warning from inside would only repeat the same line on every suppressed attempt.
+            await ResubscribeAsync(reportRefusal: false);
           }
           catch (Exception ex) when (IsFilterFault(ex) && TopicFilter != null)
           {
             // The camera accepted this filter once and now refuses it (a firmware restart that
             // dropped a vendor topic, say). Receiving everything beats receiving nothing forever.
+            _failureBackoff.Record(DateTime.UtcNow);
             _logger?.Error($"Camera rejected topic filter '{TopicFilter}' on re-subscribe for {_url}; continuing unfiltered: {ex.Message}");
             TopicFilter = null;
             needsResubscribe = true;
@@ -639,6 +676,8 @@ namespace OnvifLib
           }
           catch (Exception ex)
           {
+            _failureBackoff.Record(DateTime.UtcNow);
+
             // Only the device-service binding is in play here (ResubscribeAsync talks to
             // the device service via _deviceBindingProvider) — a challenge on this call
             // must not be attributed to the unrelated pull-point binding.
@@ -647,13 +686,16 @@ namespace OnvifLib
               _authSchemeConfirmed = false;
               _logger?.Warning($"Device-service auth scheme rejected for {_url}, switching and retrying: {ex.Message}");
             }
-            else
+            else if (report)
             {
-              _logger?.Error($"Re-subscribe failed for {_url}, will retry: {ex.Message}");
+              // A camera that answered GetServiceCapabilities is alive and refused; say how many
+              // pull points it allows. An unreachable one has no open client and costs nothing.
+              var allowance = await PullPointAllowanceAsync().ConfigureAwait(false);
+              _logger?.Error($"Re-subscribe failed for {_url} (attempt {_failureBackoff.Attempts}), will retry: {ex.Message}{allowance}");
             }
 
             needsResubscribe = true;
-            if (!await DelayAsync(TimeSpan.FromSeconds(2), token))
+            if (!await DelayAsync(RetryDelay, token))
               break;
             continue;
           }
@@ -679,6 +721,12 @@ namespace OnvifLib
 
           var pullStarted = DateTime.UtcNow;
           var response = await _pullClient.PullMessagesAsync(request);
+
+          // The pull point answers again, so the failure streak is over. One line says a camera
+          // that was off is back, and the next failure starts a fresh reporting schedule.
+          var failedAttempts = _failureBackoff.Attempts;
+          if (_failureBackoff.Reset())
+            _logger?.Info($"Pull point for {_url} re-established; {failedAttempts} failed attempts since the last successful pull");
 
           if (!_authSchemeConfirmed)
           {
@@ -739,19 +787,22 @@ namespace OnvifLib
           // pull-point binding is in play here (PullMessages/Renew both go through
           // _pullBindingProvider), so only try switching that one — a challenge on this
           // endpoint must not bleed into the device-service binding's scheme.
+          var report = _failureBackoff.Due(DateTime.UtcNow);
+          _failureBackoff.Record(DateTime.UtcNow);
+
           if (_pullBindingProvider?.TrySwitchToChallenged(ex) ?? false)
           {
             _authSchemeConfirmed = false;
             _logger?.Warning($"Pull-point auth scheme rejected for {_url}, switching and re-subscribing: {ex.Message}");
           }
-          else
+          else if (report)
           {
-            _logger?.Error($"Pull/Renew failed for {_url}, will re-subscribe: {ex.Message}");
+            _logger?.Error($"Pull/Renew failed for {_url} (attempt {_failureBackoff.Attempts}), will re-subscribe: {ex.Message}");
           }
 
           // Force a full re-subscribe on the next iteration instead of hammering a dead endpoint.
           needsResubscribe = true;
-          if (!await DelayAsync(TimeSpan.FromSeconds(2), token))
+          if (!await DelayAsync(RetryDelay, token))
             break;
         }
       }
